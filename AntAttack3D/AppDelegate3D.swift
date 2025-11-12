@@ -1,0 +1,90 @@
+import UIKit
+import SceneKit
+import os.log
+
+// File logging helper
+class FileLogger {
+    static let shared = FileLogger()
+    private let logFile: URL
+    
+    init() {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        logFile = documentsPath.appendingPathComponent("app_debug.log")
+        
+        // Create or append to log file
+        if !FileManager.default.fileExists(atPath: logFile.path) {
+            FileManager.default.createFile(atPath: logFile.path, contents: nil, attributes: nil)
+        }
+        
+        log("========================================")
+        log("NEW SESSION STARTED")
+        log("Log file: \(logFile.path)")
+        log("========================================")
+    }
+    
+    func log(_ message: String) {
+        let timestamp = Date()
+        let logMessage = "[\(timestamp)] \(message)\n"
+        
+        // Print to console
+        print(logMessage)
+        NSLog("%@", logMessage)
+        
+        // Write to file
+        if let data = logMessage.data(using: .utf8) {
+            if let fileHandle = try? FileHandle(forWritingTo: logFile) {
+                fileHandle.seekToEndOfFile()
+                fileHandle.write(data)
+                fileHandle.closeFile()
+            }
+        }
+    }
+    
+    func getLogPath() -> String {
+        return logFile.path
+    }
+}
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    
+    var window: UIWindow?
+    
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Start file logging immediately
+        FileLogger.shared.log("🚀 APP LAUNCHED - AppDelegate.application(_:didFinishLaunchingWithOptions:)")
+        FileLogger.shared.log("🚀 Using triple logging: print + NSLog + file")
+        
+        print("========================================")
+        print("🚀 APP LAUNCHED - AppDelegate starting")
+        print("========================================")
+        NSLog("🚀 APP LAUNCHED - AppDelegate starting")
+        os_log("🚀 APP LAUNCHED - AppDelegate starting", type: .error)
+        
+        FileLogger.shared.log("✅ Creating UIWindow")
+        
+        // Create window programmatically
+        window = UIWindow(frame: UIScreen.main.bounds)
+        print("✅ Window created: \(UIScreen.main.bounds)")
+        NSLog("✅ Window created")
+        FileLogger.shared.log("✅ Window created: \(UIScreen.main.bounds)")
+        
+        FileLogger.shared.log("✅ Creating GameViewController3D")
+        
+        // Create the view controller
+        let viewController = GameViewController3D()
+        window?.rootViewController = viewController
+        print("✅ View controller set: GameViewController3D")
+        NSLog("✅ View controller set: GameViewController3D")
+        FileLogger.shared.log("✅ View controller set")
+        
+        window?.makeKeyAndVisible()
+        print("✅ Window made visible")
+        print("========================================")
+        NSLog("✅ Window made visible - App ready")
+        FileLogger.shared.log("✅ Window made visible - App ready")
+        FileLogger.shared.log("📁 Log file location: \(FileLogger.shared.getLogPath())")
+        
+        return true
+    }
+}

@@ -38,7 +38,7 @@ class GameScene3D: SCNScene {
     private var isSearchingForBall: Bool = false
     private var framesInCurrentOrbitPosition: Int = 0
     private let framesBeforeNextOrbit = 30      // Wait 0.5 seconds at each position (at 60fps)
-    private let orbitStepDegrees: Float = 45.0  // Rotate 45 degrees each step
+    private let orbitStepDegrees: Float = 90.0  // Rotate 90 degrees each step
     
     // Debug counters
     private var updateCameraFrameCount = 0
@@ -90,6 +90,11 @@ class GameScene3D: SCNScene {
         // Setup camera
         setupCamera()
         print("Camera setup complete")
+        
+        // Initialize orbit angle to match camera's starting position (south of center, positive Z)
+        // Camera starts at z = centerZ + 30, which corresponds to 0° in our coordinate system
+        cameraOrbitAngle = 0.0
+        print("Camera orbit angle initialized to 0° (south)")
         
         // Setup lighting
         setupLighting()
@@ -632,12 +637,28 @@ class GameScene3D: SCNScene {
     func updateBallPhysics() {
         guard let physicsBody = ballNode.physicsBody else { return }
         
-        // Apply movement based on stored controller input
+        // Transform input to be camera-relative
+        // Convert orbit angle from degrees to radians
+        let cameraAngleRadians = cameraOrbitAngle * Float.pi / 180.0
+        
+        // Rotate input vector by camera angle
+        // currentMoveX = left/right, currentMoveZ = forward/back (relative to joystick)
+        // We want: up on joystick (positive z) = away from camera, down = towards camera
+        // The camera looks back at the ball, so we need to negate the Z component
+        let worldX = currentMoveX * cos(cameraAngleRadians) + currentMoveZ * sin(cameraAngleRadians)
+        let worldZ = -currentMoveX * sin(cameraAngleRadians) + currentMoveZ * cos(cameraAngleRadians)
+        
+        // Debug logging (only when there's input)
+        if abs(currentMoveX) > 0.1 || abs(currentMoveZ) > 0.1 {
+            print("🎮 Input: x=\(String(format: "%.2f", currentMoveX)), z=\(String(format: "%.2f", currentMoveZ)) | Camera: \(String(format: "%.0f", cameraOrbitAngle))° | World: x=\(String(format: "%.2f", worldX)), z=\(String(format: "%.2f", worldZ))")
+        }
+        
+        // Apply movement based on camera-relative controller input
         let speed: Float = 8.0  // Units per second
         let newVelocity = SCNVector3(
-            x: currentMoveX * speed,
+            x: worldX * speed,
             y: physicsBody.velocity.y,  // Preserve vertical velocity (for jumping/falling)
-            z: currentMoveZ * speed
+            z: worldZ * speed
         )
         physicsBody.velocity = newVelocity
     }
