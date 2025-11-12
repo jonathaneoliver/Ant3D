@@ -1,0 +1,11 @@
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+.DS_Store
+
+# Build artifacts
+build/
+
+# Config server logs
+config-server.log
