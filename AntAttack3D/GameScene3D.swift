@@ -2,6 +2,9 @@ import SceneKit
 import UIKit
 import os.log
 
+// Create logger for GameScene3D
+private let logger = Logger(subsystem: "com.example.AntAttack3D", category: "GameScene")
+
 class GameScene3D: SCNScene {
     
     var cityMap: CityMap3D!
@@ -69,11 +72,7 @@ class GameScene3D: SCNScene {
     
     override init() {
         super.init()
-        print("========================================")
-        print("🏙️  GameScene3D init() called")
-        print("========================================")
-        NSLog("🏙️  GameScene3D init() called")
-        os_log("🏙️  GameScene3D init() called", type: .error)
+        logger.info("GameScene3D initialized")
         setupScene()
         setupConfigListener()
     }
@@ -94,17 +93,15 @@ class GameScene3D: SCNScene {
     
     // Called when config is received (either from callback or forwarded from view controller)
     func onConfigReceived(_ config: GameConfig) {
-        print("GameScene3D: Received config update - angle: \(config.droneAngle)°, distance: \(config.droneDistance), ambient: \(config.ambientLight), shadows: \(config.shadowsEnabled), orbitSearchDelay: \(config.orbitSearchDelay)s")
+        logger.debug("Config update: angle=\(config.droneAngle)°, distance=\(config.droneDistance), shadows=\(config.shadowsEnabled)")
         
         // Only force immediate camera update if angle or distance changed
         let angleChanged = self.droneAngle != config.droneAngle
         let distanceChanged = self.droneDistance != config.droneDistance
         
         if distanceChanged {
-            print("📏 Drone distance changed: \(self.droneDistance) → \(config.droneDistance)")
         }
         if angleChanged {
-            print("📐 Drone angle changed: \(self.droneAngle)° → \(config.droneAngle)°")
         }
         
         self.droneAngle = config.droneAngle
@@ -113,7 +110,6 @@ class GameScene3D: SCNScene {
         
         if angleChanged || distanceChanged {
             self.forceImmediateCameraUpdate = true
-            print("📷 Camera config changed - will apply immediate update on next frame")
         }
         
         self.updateAmbientLight(config.ambientLight)
@@ -122,7 +118,6 @@ class GameScene3D: SCNScene {
     
     // Load map from MapData (supports both blocks and heightMap formats)
     func loadMap(mapData: MapData) {
-        print("📥 Loading map: \(mapData.name)")
         
         // Check if this is a heightMap format (Ant Attack style)
         if let heightMap = mapData.heightMap {
@@ -139,7 +134,6 @@ class GameScene3D: SCNScene {
         
         // Render new city
         renderCity()
-        print("✅ Map loaded and rendered: \(mapData.name)")
         
         // Update camera to center on new map size
         updateCameraForMapSize()
@@ -160,13 +154,9 @@ class GameScene3D: SCNScene {
             cameraNode.look(at: SCNVector3(x: centerX, y: 10, z: centerZ))
         }
         
-        print("🎥 Camera updated for map size: \(cityMap.width)x\(cityMap.height)")
     }
     
     func setupScene() {
-        print("========================================")
-        print("🏗️  GameScene setupScene started")
-        print("========================================")
         NSLog("🏗️  GameScene setupScene started")
         os_log("🏗️  GameScene setupScene started", type: .error)
         
@@ -175,40 +165,31 @@ class GameScene3D: SCNScene {
         
         // Create temporary city map (will be replaced with Ant Attack Original)
         cityMap = CityMap3D(width: 60, height: 60, useAntAttackMap: false)
-        print("Temporary CityMap created (will load Ant Attack Original...)")
         
         // Setup camera
         setupCamera()
-        print("Camera setup complete")
         
         // Initialize orbit angle to match camera's starting position (south of center, positive Z)
         // Camera starts at z = centerZ + 30, which corresponds to 0° in our coordinate system
         cameraOrbitAngle = 0.0
-        print("Camera orbit angle initialized to 0° (south)")
         
         // Setup lighting
         setupLighting()
-        print("Lighting setup complete")
         
         // Render the city
         renderCity()
-        print("City rendered - \(blockNodes.count) blocks created")
         
         // Add axis labels
         addAxisLabels()
-        print("Axis labels added")
         
         // Create the ball
         createBall()
-        print("Ball created")
         
         // Create enemy balls
         createEnemyBalls()
-        print("Enemy balls created: \(enemyBalls.count)")
         
         // Send initial visibility state to HUD
         onBallVisibilityChanged?(true)
-        print("🎯 Initial ball visibility set to: VISIBLE ✅")
         
         // Load Ant Attack Original map asynchronously
         loadAntAttackOriginalMap()
@@ -218,32 +199,26 @@ class GameScene3D: SCNScene {
     private func loadAntAttackOriginalMap() {
         // First, try to load the bundled map (instant, no network required)
         if let bundledMap = ConfigManager.shared.loadBundledAntAttackMap() {
-            print("✅ Loading bundled Ant Attack Original map: \(bundledMap.width)x\(bundledMap.height)")
             loadMap(mapData: bundledMap)
             
             // Optionally fetch updated version from server in background
-            print("🔄 Checking server for updated map version...")
             ConfigManager.shared.fetchMap(name: "Ant_Attack_Original") { [weak self] result in
                 switch result {
                 case .success(let serverMap):
-                    print("✅ Server map received, updating to latest version")
                     self?.loadMap(mapData: serverMap)
-                case .failure(let error):
-                    print("ℹ️  Server unavailable, using bundled map (error: \(error.localizedDescription))")
+                case .failure:
+                    break  // Server unavailable, continue with bundled map
                 }
             }
         } else {
             // Bundled map failed to load, try server
-            print("⚠️  Bundled map not found, trying server...")
             ConfigManager.shared.fetchMap(name: "Ant_Attack_Original") { [weak self] result in
                 switch result {
                 case .success(let mapData):
-                    print("✅ Ant Attack Original map loaded from server")
                     self?.loadMap(mapData: mapData)
                     
                 case .failure(let error):
-                    print("❌ Failed to load map from both bundle and server: \(error.localizedDescription)")
-                    print("   Using procedurally generated map as final fallback")
+                    logger.error("Failed to load map: \(error.localizedDescription)")
                     // Final fallback: replace temporary map with procedural Ant Attack-style map
                     DispatchQueue.main.async {
                         self?.cityMap = CityMap3D(width: 60, height: 60, useAntAttackMap: true)
@@ -251,7 +226,6 @@ class GameScene3D: SCNScene {
                         self?.blockNodes.removeAll()
                         self?.renderCity()
                         self?.updateCameraForMapSize()
-                        print("✅ Fallback: Loaded procedural Ant Attack-style map")
                     }
                 }
             }
@@ -800,7 +774,6 @@ class GameScene3D: SCNScene {
             rootNode.addChildNode(enemy.node)
             enemyBalls.append(enemy)
             
-            print("🕷️ Enemy ball created at (\(String(format: "%.1f", x)), \(String(format: "%.1f", z)))")
         }
     }
     
@@ -848,7 +821,6 @@ class GameScene3D: SCNScene {
         
         // Debug logging (only when there's input)
         if abs(currentMoveX) > 0.1 || abs(currentMoveZ) > 0.1 {
-            print("🎮 Input: x=\(String(format: "%.2f", currentMoveX)), z=\(String(format: "%.2f", currentMoveZ)) | Camera: \(String(format: "%.0f", cameraOrbitAngle))° | World: x=\(String(format: "%.2f", worldX)), z=\(String(format: "%.2f", worldZ))")
         }
         
         // Calculate movement direction and speed
@@ -872,13 +844,11 @@ class GameScene3D: SCNScene {
                 moveDirection.y = climbAssist
                 
                 if abs(worldX) > 0.1 || abs(worldZ) > 0.1 {
-                    print("⛰️ Climbing slope: angle=\(String(format: "%.1f", slopeAngle * 180.0 / Float.pi))°, assist=\(String(format: "%.1f", climbAssist))")
                 }
             } else if upDot > 0 {
                 // Going downhill - apply damping to prevent runaway speed
                 dampingFactor = 0.5  // Reduce speed by half when going downhill
                 if abs(worldX) > 0.1 || abs(worldZ) > 0.1 {
-                    print("⬇️ Going downhill - applying damping")
                 }
             }
         }
@@ -906,17 +876,13 @@ class GameScene3D: SCNScene {
                     // Moving more in X direction - lock to pure East/West
                     moveDirection.x = worldX > 0 ? abs(worldX) : -abs(worldX)
                     moveDirection.z = 0
-                    print("🧗 CLIMBING WALL (E/W locked) - up=\(climbSpeed) units/s, x=\(String(format: "%.2f", moveDirection.x)), distance=\(String(format: "%.2f", wallCheck.distance))")
                 } else {
                     // Moving more in Z direction - lock to pure North/South
                     moveDirection.x = 0
                     moveDirection.z = worldZ > 0 ? abs(worldZ) : -abs(worldZ)
-                    print("🧗 CLIMBING WALL (N/S locked) - up=\(climbSpeed) units/s, z=\(String(format: "%.2f", moveDirection.z)), distance=\(String(format: "%.2f", wallCheck.distance))")
                 }
             } else if wallCheck.hasWall {
-                print("🧗 Climb mode active, wall detected but too far: \(String(format: "%.2f", wallCheck.distance))")
             } else {
-                print("🧗 Climb mode active but no wall detected")
             }
         }
         
@@ -1005,7 +971,6 @@ class GameScene3D: SCNScene {
     // Check if there's a wall in front of the ball (in movement direction)
     func checkWallAhead() -> (hasWall: Bool, distance: Float, normal: SCNVector3) {
         guard let ballPosition = ballNode?.presentation.position else {
-            print("🔍 Wall check: No ball position")
             return (false, 0, SCNVector3(0, 1, 0))
         }
         
@@ -1014,11 +979,9 @@ class GameScene3D: SCNScene {
         let worldX = currentMoveX * cos(cameraAngleRadians) + currentMoveZ * sin(cameraAngleRadians)
         let worldZ = -currentMoveX * sin(cameraAngleRadians) + currentMoveZ * cos(cameraAngleRadians)
         
-        print("🔍 Wall check: input=(\(String(format: "%.2f", currentMoveX)),\(String(format: "%.2f", currentMoveZ))) world=(\(String(format: "%.2f", worldX)),\(String(format: "%.2f", worldZ)))")
         
         // Only check if there's significant horizontal movement
         if abs(worldX) < 0.1 && abs(worldZ) < 0.1 {
-            print("🔍 Wall check: Movement too small, skipping")
             return (false, 0, SCNVector3(0, 1, 0))
         }
         
@@ -1045,14 +1008,12 @@ class GameScene3D: SCNScene {
             z: ballPosition.z + dirZ * (rayStartOffset + checkDistance)
         )
         
-        print("🔍 Wall check: Raycast from (\(String(format: "%.1f", rayStart.x)),\(String(format: "%.1f", rayStart.y)),\(String(format: "%.1f", rayStart.z))) to (\(String(format: "%.1f", rayEnd.x)),\(String(format: "%.1f", rayEnd.y)),\(String(format: "%.1f", rayEnd.z)))")
         
         let hitResults = rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: [
             SCNHitTestOption.searchMode.rawValue: SCNHitTestSearchMode.closest.rawValue,
             SCNHitTestOption.backFaceCulling.rawValue: false
         ])
         
-        print("🔍 Wall check: Found \(hitResults.count) hits")
         
         // Find first hit that isn't the ball
         for hit in hitResults {
@@ -1061,22 +1022,18 @@ class GameScene3D: SCNScene {
                 
                 // Check if this is a vertical wall (normal pointing mostly horizontal)
                 let horizontalDot = sqrt(normal.x * normal.x + normal.z * normal.z)
-                print("🔍 Hit: node=\(hit.node.name ?? "unnamed"), normal=(\(String(format: "%.2f", normal.x)),\(String(format: "%.2f", normal.y)),\(String(format: "%.2f", normal.z))), horizontalDot=\(String(format: "%.2f", horizontalDot))")
                 
                 if horizontalDot > 0.7 {  // More than 45 degrees from horizontal = wall
                     let distance = sqrt(
                         pow(hit.worldCoordinates.x - ballPosition.x, 2) +
                         pow(hit.worldCoordinates.z - ballPosition.z, 2)
                     )
-                    print("✅ Found wall! distance=\(String(format: "%.2f", distance))")
                     return (true, distance, normal)
                 } else {
-                    print("❌ Hit is not a wall (horizontalDot=\(String(format: "%.2f", horizontalDot)) <= 0.7)")
                 }
             }
         }
         
-        print("🔍 Wall check: No wall found")
         return (false, 0, SCNVector3(0, 1, 0))
     }
     
@@ -1122,7 +1079,6 @@ class GameScene3D: SCNScene {
         // Increase friction to help stick to walls during climb
         physicsBody.friction = 2.0
         
-        print("🧗 CLIMB MODE ACTIVATED - restitution=0.0, friction=2.0 to prevent bounce")
     }
     
     // Stop wall-climbing mode
@@ -1136,9 +1092,7 @@ class GameScene3D: SCNScene {
         // This prevents the ball from floating after releasing climb button
         if physicsBody.velocity.y > 0 {
             physicsBody.velocity.y = 0
-            print("🧗 CLIMB MODE DEACTIVATED - cancelled upward velocity, gravity restored")
         } else {
-            print("🧗 CLIMB MODE DEACTIVATED - normal physics restored")
         }
         
         // Restore normal restitution and friction
@@ -1157,10 +1111,7 @@ class GameScene3D: SCNScene {
         
         // Log ball position periodically
         if updateCameraFrameCount % 60 == 0 {  // Log every second at 60fps
-            print("📹 Camera update frame \(updateCameraFrameCount)")
-            print("   ⚽ Ball position: (\(String(format: "%.2f", ballPosition.x)), \(String(format: "%.2f", ballPosition.y)), \(String(format: "%.2f", ballPosition.z)))")
             if let velocity = ballNode.physicsBody?.velocity {
-                print("   🏃 Ball velocity: (\(String(format: "%.2f", velocity.x)), \(String(format: "%.2f", velocity.y)), \(String(format: "%.2f", velocity.z)))")
             }
         }
         
@@ -1186,7 +1137,6 @@ class GameScene3D: SCNScene {
             if hasCompletedFullRotation {
                 // Ball is completely occluded, stop searching and keep current angle
                 // Don't continue orbiting - the ball won't become visible
-                print("⚠️  Ball remains hidden after 360° rotation - stopping orbit search")
             } else {
                 // ORBIT MODE: Increment frame counter and rotate to next position when ready
                 framesInCurrentOrbitPosition += 1
@@ -1206,9 +1156,7 @@ class GameScene3D: SCNScene {
                     if normalizedRotation >= 360.0 || (normalizedRotation >= 0 && normalizedRotation < orbitStepDegrees && cameraOrbitAngle != orbitSearchStartAngle) {
                         // We've rotated a full circle and ball is still hidden
                         hasCompletedFullRotation = true
-                        print("🔄 Completed 360° rotation without finding ball - stopping search")
                     } else {
-                        print("🔄 Orbiting to next position: \(String(format: "%.0f", cameraOrbitAngle))° (rotated \(String(format: "%.0f", normalizedRotation))° so far)")
                     }
                 }
             }
@@ -1236,9 +1184,6 @@ class GameScene3D: SCNScene {
         // Clear the force update flag after applying
         if forceImmediateCameraUpdate {
             forceImmediateCameraUpdate = false
-            print("📷 Applied immediate camera position update from config change")
-            print("   New camera position: (\(String(format: "%.1f", cameraNode.position.x)), \(String(format: "%.1f", cameraNode.position.y)), \(String(format: "%.1f", cameraNode.position.z)))")
-            print("   Target distance: \(droneDistance), angle: \(droneAngle)°")
             
             // Force SceneKit to render the new camera position immediately
             sceneView?.setNeedsDisplay()
@@ -1253,7 +1198,6 @@ class GameScene3D: SCNScene {
         // Report distance to HUD (every frame)
         distanceUpdateCount += 1
         if distanceUpdateCount % 60 == 0 {  // Log every second at 60fps
-            print("📏 Distance update #\(distanceUpdateCount): \(String(format: "%.1f", actualDistance)) (target: \(droneDistance))")
         }
         onDistanceChanged?(actualDistance)
         
@@ -1284,20 +1228,18 @@ class GameScene3D: SCNScene {
         if isVisible != lastVisibilityState {
             lastVisibilityState = isVisible
             onBallVisibilityChanged?(isVisible)
-            print("🎯 BALL VISIBILITY CHANGED: \(isVisible ? "VISIBLE ✅" : "NOT VISIBLE ❌") (after \(isVisible ? visibleFrameCount : hiddenFrameCount) frames)")
+            logger.debug("Ball visibility: \(isVisible ? "visible" : "hidden")")
             
             // Handle search mode transitions
             if !isVisible && !isSearchingForBall {
                 // Ball just became hidden -> reset hidden duration timer
                 hiddenDuration = 0.0
-                print("⏱️  Ball hidden - starting delay timer (\(String(format: "%.1f", orbitSearchDelay))s)")
             } else if isVisible && isSearchingForBall {
                 // Ball just became visible -> stop searching (keep current angle)
                 isSearchingForBall = false
                 framesInCurrentOrbitPosition = 0
                 hasCompletedFullRotation = false  // Reset for next search
                 hiddenDuration = 0.0  // Reset timer
-                print("✅ ORBIT SEARCH COMPLETE - Ball found at \(String(format: "%.0f", cameraOrbitAngle))°")
             } else if isVisible {
                 // Ball is visible -> reset hidden duration
                 hiddenDuration = 0.0
@@ -1320,7 +1262,6 @@ class GameScene3D: SCNScene {
                 cameraOrbitAngle = atan2(currentDx, currentDz) * 180.0 / Float.pi
                 if cameraOrbitAngle < 0 { cameraOrbitAngle += 360.0 }
                 orbitSearchStartAngle = cameraOrbitAngle  // Remember where we started
-                print("🔍 STARTING ORBIT SEARCH at \(String(format: "%.0f", cameraOrbitAngle))° (after \(String(format: "%.1f", hiddenDuration))s delay)")
             }
         }
         
@@ -1343,9 +1284,6 @@ class GameScene3D: SCNScene {
         let shouldLog = (visibilityRaycastCount % 300 == 0)
         
         if shouldLog {
-            print("🔍 Visibility check #\(visibilityRaycastCount)")
-            print("  📍 Camera: (\(String(format: "%.1f", cameraPos.x)), \(String(format: "%.1f", cameraPos.y)), \(String(format: "%.1f", cameraPos.z)))")
-            print("  ⚽ Ball: (\(String(format: "%.1f", ballPosition.x)), \(String(format: "%.1f", ballPosition.y)), \(String(format: "%.1f", ballPosition.z)))")
         }
         
         // APPROACH: Use screen-space hit testing
@@ -1353,7 +1291,6 @@ class GameScene3D: SCNScene {
         // This accounts for actual rendering, not just geometric occlusion
         
         guard let view = sceneView else {
-            if shouldLog { print("  ⚠️  No sceneView reference") }
             return true  // Assume visible if we can't test
         }
         
@@ -1362,12 +1299,10 @@ class GameScene3D: SCNScene {
         let screenPoint = CGPoint(x: CGFloat(ballScreenPos.x), y: CGFloat(ballScreenPos.y))
         
         if shouldLog {
-            print("  📱 Screen pos: (\(String(format: "%.1f", screenPoint.x)), \(String(format: "%.1f", screenPoint.y)))")
         }
         
         // Check if screen point is within view bounds
         guard view.bounds.contains(screenPoint) else {
-            if shouldLog { print("  ❌ Ball off-screen (outside view bounds)") }
             return false
         }
         
@@ -1380,7 +1315,6 @@ class GameScene3D: SCNScene {
         let hits = view.hitTest(screenPoint, options: hitOptions)
         
         if hits.isEmpty {
-            if shouldLog { print("  ⚠️  No hits at screen position") }
             return false
         }
         
@@ -1405,15 +1339,11 @@ class GameScene3D: SCNScene {
             let isNearBall = distanceDiff < 1.0  // Within 1 unit
             
             if shouldLog {
-                print("  🎯 Hit: '\(hitNodeName)' at distance \(String(format: "%.1f", hitDistance))")
-                print("  📏 Ball distance: \(String(format: "%.1f", ballDistance)), diff: \(String(format: "%.1f", distanceDiff))")
             }
             
             if isBall || isNearBall {
-                if shouldLog { print("  ✅ BALL VISIBLE") }
                 return true
             } else {
-                if shouldLog { print("  ❌ Blocked by '\(hitNodeName)'") }
                 return false
             }
         }
@@ -1436,7 +1366,7 @@ class GameScene3D: SCNScene {
     func updateAmbientLight(_ intensity: Float) {
         ambientLightIntensity = intensity
         ambientLightNode?.light?.color = UIColor(white: CGFloat(intensity), alpha: 1.0)
-        print("GameScene3D: Ambient light updated to \(intensity)")
+        logger.debug("Ambient light: \(intensity)")
     }
     
     // Update shadows enabled/disabled
@@ -1452,7 +1382,7 @@ class GameScene3D: SCNScene {
         // Update ball
         ballNode?.castsShadow = enabled
         
-        print("GameScene3D: Shadows \(enabled ? "enabled" : "disabled")")
+        logger.debug("Shadows: \(enabled ? "enabled" : "disabled")")
     }
     
     // MARK: - Collision Detection
@@ -1479,7 +1409,7 @@ class GameScene3D: SCNScene {
             let distance = playerPosition.distance(to: enemyPosition)
             
             if distance < collisionDistance {
-                print("💥 COLLISION DETECTED: Player hit by enemy at distance \(distance)")
+                logger.info("Enemy collision detected")
                 isGameOver = true  // Set flag to prevent multiple triggers
                 // Trigger game over
                 onGameOver?()

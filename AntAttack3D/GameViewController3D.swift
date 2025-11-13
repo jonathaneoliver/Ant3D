@@ -3,6 +3,9 @@ import UIKit
 import GameController
 import os.log
 
+// Create logger for GameViewController3D
+private let logger = Logger(subsystem: "com.example.AntAttack3D", category: "GameViewController")
+
 class GameViewController3D: UIViewController {
     
     var sceneView: SCNView!
@@ -21,9 +24,6 @@ class GameViewController3D: UIViewController {
         FileLogger.shared.log("🎮 GameViewController.viewDidLoad() called")
         
         // Triple-log to ensure visibility
-        print("========================================")
-        print("🎮 GameViewController viewDidLoad started")
-        print("========================================")
         NSLog("🎮 GameViewController viewDidLoad started")
         os_log("🎮 GameViewController viewDidLoad started", type: .error)
         
@@ -38,7 +38,6 @@ class GameViewController3D: UIViewController {
         sceneView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(sceneView)
         
-        print("✅ SceneView created and added to view")
         NSLog("✅ SceneView created and added to view")
         FileLogger.shared.log("✅ SceneView created")
         updateDebugLabel("SceneView created")
@@ -48,7 +47,6 @@ class GameViewController3D: UIViewController {
         sceneView.scene = gameScene
         gameScene.sceneView = sceneView  // Give scene a reference to view for hit testing
         
-        print("✅ GameScene created and set")
         NSLog("✅ GameScene created and set")
         FileLogger.shared.log("✅ GameScene created")
         updateDebugLabel("GameScene created")
@@ -108,9 +106,7 @@ class GameViewController3D: UIViewController {
         // Start camera update loop
         startCameraUpdateLoop()
         
-        print("========================================")
-        print("✅ GameViewController viewDidLoad COMPLETE")
-        print("========================================")
+        logger.info("GameViewController loaded")
         NSLog("✅ GameViewController viewDidLoad COMPLETE")
         os_log("✅ GameViewController viewDidLoad COMPLETE", type: .error)
         FileLogger.shared.log("✅ GameViewController viewDidLoad COMPLETE")
@@ -153,9 +149,6 @@ class GameViewController3D: UIViewController {
     // MARK: - Connection Status HUD
     
     func setupConnectionStatusHUD() {
-        print("========================================")
-        print("GameViewController: setupConnectionStatusHUD called")
-        print("========================================")
         
         // Create status label
         connectionStatusLabel = UILabel()
@@ -185,11 +178,9 @@ class GameViewController3D: UIViewController {
             connectionStatusLabel.heightAnchor.constraint(equalToConstant: 24)   // Visual width after rotation
         ])
         
-        print("GameViewController: HUD label created, rotated 90°, and added to far left edge below time")
     }
     
     func updateConnectionStatus(_ isConnected: Bool, serverURL: String) {
-        print("GameViewController: Updating HUD - connected: \(isConnected), server: \(serverURL)")
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -198,12 +189,10 @@ class GameViewController3D: UIViewController {
                 self.connectionStatusLabel.text = " ● \(serverURL) "
                 self.connectionStatusLabel.textColor = UIColor(red: 0.3, green: 1.0, blue: 0.3, alpha: 1.0) // Bright green
                 self.connectionStatusLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-                print("GameViewController: HUD updated to CONNECTED (green)")
             } else {
                 self.connectionStatusLabel.text = " ○ \(serverURL) "
                 self.connectionStatusLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0) // Bright red
                 self.connectionStatusLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-                print("GameViewController: HUD updated to DISCONNECTED (red)")
             }
         }
     }
@@ -211,7 +200,6 @@ class GameViewController3D: UIViewController {
     // MARK: - Ball Visibility HUD
     
     func setupVisibilityHUD() {
-        print("GameViewController: setupVisibilityHUD called")
         
         // Create visibility label
         visibilityLabel = UILabel()
@@ -240,7 +228,6 @@ class GameViewController3D: UIViewController {
             visibilityLabel.heightAnchor.constraint(equalToConstant: 28)   // Visual width after rotation
         ])
         
-        print("GameViewController: Visibility HUD label created, rotated 90°, and added to far left edge")
     }
     
     func updateBallVisibility(_ isVisible: Bool) {
@@ -255,7 +242,6 @@ class GameViewController3D: UIViewController {
                 self.visibilityLabel.text = " ⚠️ Ball: HIDDEN "
                 self.visibilityLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0) // Bright red
                 self.visibilityLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-                print("GameViewController: Visibility HUD updated to HIDDEN (red)")
             }
         }
     }
@@ -263,7 +249,6 @@ class GameViewController3D: UIViewController {
     // MARK: - Distance HUD
     
     func setupDistanceHUD() {
-        print("GameViewController: setupDistanceHUD called")
         
         // Create distance label
         distanceLabel = UILabel()
@@ -292,7 +277,6 @@ class GameViewController3D: UIViewController {
             distanceLabel.heightAnchor.constraint(equalToConstant: 28)   // Visual width after rotation
         ])
         
-        print("GameViewController: Distance HUD label created, rotated 90°, and added to far left edge")
     }
     
     func updateDistance(_ distance: Float) {
@@ -312,7 +296,6 @@ class GameViewController3D: UIViewController {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            print("GameViewController: \(shouldShow ? "Showing" : "Hiding") debug HUD elements")
             
             // Toggle visibility of all three debug HUD elements
             self.connectionStatusLabel.isHidden = !shouldShow
@@ -347,7 +330,6 @@ class GameViewController3D: UIViewController {
     // MARK: - Xbox Controller Support
     
     func setupGameController() {
-        print("Setting up game controller support")
         
         // Watch for controller connections
         NotificationCenter.default.addObserver(
@@ -372,13 +354,11 @@ class GameViewController3D: UIViewController {
     
     @objc func controllerDidConnect(_ notification: Notification) {
         if let controller = notification.object as? GCController {
-            print("Controller connected: \(controller.vendorName ?? "Unknown")")
             connectController(controller)
         }
     }
     
     @objc func controllerDidDisconnect(_ notification: Notification) {
-        print("Controller disconnected")
         controller = nil
     }
     
@@ -387,7 +367,6 @@ class GameViewController3D: UIViewController {
         
         // Handle extended gamepad (Xbox, PlayStation, etc.)
         if let gamepad = controller.extendedGamepad {
-            print("Extended gamepad connected")
             
             // Left stick for ball movement
             gamepad.leftThumbstick.valueChangedHandler = { [weak self] (stick, xValue, yValue) in
@@ -398,10 +377,8 @@ class GameViewController3D: UIViewController {
             // A button for wall climbing (hold to climb)
             gamepad.buttonA.valueChangedHandler = { [weak self] (button, value, pressed) in
                 if pressed {
-                    print("A button pressed - Climb mode activated!")
                     self?.gameScene.jumpBall()
                 } else {
-                    print("A button released - Climb mode deactivated!")
                     self?.gameScene.releaseJump()
                 }
             }
@@ -410,7 +387,6 @@ class GameViewController3D: UIViewController {
             // B button could be used for something else
             gamepad.buttonB.valueChangedHandler = { [weak self] (button, value, pressed) in
                 if pressed {
-                    print("B button pressed")
                     // Could add special action here
                 }
             }
@@ -451,11 +427,11 @@ class GameViewController3D: UIViewController {
     }
     
     func showGameOver() {
-        print("🎮 showGameOver() called")
+        logger.info("Game over triggered")
         
         // Don't create multiple game over views
         if gameOverView != nil {
-            print("⚠️ Game over view already exists, ignoring")
+            logger.debug("Game over view already exists")
             return
         }
         
@@ -512,7 +488,7 @@ class GameViewController3D: UIViewController {
         restartButton.addTarget(self, action: #selector(buttonTouchDown), for: .touchDown)
         restartButton.addTarget(self, action: #selector(buttonTouchUp), for: [.touchUpInside, .touchUpOutside])
         
-        print("✅ Restart button created and target added")
+        // Restart button created
         
         // Add subviews
         containerView.addSubview(titleLabel)
@@ -561,21 +537,19 @@ class GameViewController3D: UIViewController {
             overlay.alpha = 1.0
         }
         
-        print("🎮 Game Over UI displayed")
+        logger.info("Game over UI displayed")
     }
     
     @objc func buttonTouchDown(_ sender: UIButton) {
-        print("🔵 Button touch DOWN detected!")
         sender.alpha = 0.5
     }
     
     @objc func buttonTouchUp(_ sender: UIButton) {
-        print("🔵 Button touch UP detected!")
         sender.alpha = 1.0
     }
     
     @objc func restartGame() {
-        print("🔄🔄🔄 RESTART BUTTON TAPPED! 🔄🔄🔄")
+        logger.info("Game restarted")
         NSLog("🔄🔄🔄 RESTART BUTTON TAPPED! 🔄🔄🔄")
         
         // Reset game over flag in scene
@@ -583,25 +557,20 @@ class GameViewController3D: UIViewController {
         
         // Remove game over UI
         if let overlay = self.gameOverView {
-            print("Removing game over view...")
             UIView.animate(withDuration: 0.2, animations: {
                 overlay.alpha = 0
             }) { _ in
-                print("Animation complete, removing from superview")
                 overlay.removeFromSuperview()
                 self.gameOverView = nil
             }
         } else {
-            print("⚠️ No gameOverView to remove!")
         }
         
         // Unpause the game
-        print("Unpausing game...")
         isPaused = false
         sceneView.scene?.isPaused = false
         
         // Reset ball position to starting location (top-right corner)
-        print("Resetting ball position...")
         let mapWidth = Float(gameScene.cityMap.width)
         let mapHeight = Float(gameScene.cityMap.height)
         gameScene.ballNode.position = SCNVector3(x: mapWidth - 5, y: 5, z: mapHeight - 5)
@@ -609,9 +578,7 @@ class GameViewController3D: UIViewController {
         gameScene.ballNode.physicsBody?.angularVelocity = SCNVector4(0, 0, 0, 0)
         
         // Reset enemy positions to corners
-        print("Recreating enemy balls...")
         gameScene.createEnemyBalls()
         
-        print("✅✅✅ Game restarted successfully! ✅✅✅")
     }
 }
