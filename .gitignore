@@ -11,5 +11,7 @@ build/
 node_modules/
 npm-debug.log
 
-# Config server logs
+# Config server logs and runtime state
 config-server.log
+config-server/.config-server.pid
+config-server/.server_state/

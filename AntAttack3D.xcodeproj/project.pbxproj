@@ -13,6 +13,7 @@
 		AA123456789ABCDEF0123456 /* ant_attack_original.json in Resources */ = {isa = PBXBuildFile; fileRef = AA123456789ABCDEF0123455 /* ant_attack_original.json */; };
 		CF123456789ABCDEF0123456 /* ConfigManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF123456789ABCDEF0123455 /* ConfigManager.swift */; };
 		D9E9730A004C4AACA7FB2D40 /* CityMap3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */; };
+		EB123456789ABCDEF0123456 /* EnemyBall.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB123456789ABCDEF0123455 /* EnemyBall.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 		AA123456789ABCDEF0123455 /* ant_attack_original.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ant_attack_original.json; sourceTree = "<group>"; };
 		CF123456789ABCDEF0123455 /* ConfigManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigManager.swift; sourceTree = "<group>"; };
 		D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityMap3D.swift; sourceTree = "<group>"; };
+		EB123456789ABCDEF0123455 /* EnemyBall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnemyBall.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +47,7 @@
 			085B4AB8003B465398DAB2EF /* GameScene3D.swift */,
 			D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */,
 			CF123456789ABCDEF0123455 /* ConfigManager.swift */,
+			EB123456789ABCDEF0123455 /* EnemyBall.swift */,
 			AA123456789ABCDEF0123455 /* ant_attack_original.json */,
 			0C9D6469006E49198136897C /* Info.plist */,
 		);
@@ -132,18 +135,19 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		F0E8FDFA00E5DAD4BDAA1D5A /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				7038269C001F40A19E912B72 /* AppDelegate3D.swift in Sources */,
-				9B3C8709002A41139AE80306 /* GameViewController3D.swift in Sources */,
-				085B4AB8003B465398DAB2F0 /* GameScene3D.swift in Sources */,
-				D9E9730A004C4AACA7FB2D40 /* CityMap3D.swift in Sources */,
-				CF123456789ABCDEF0123456 /* ConfigManager.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+	F0E8FDFA00E5DAD4BDAA1D5A /* Sources */ = {
+		isa = PBXSourcesBuildPhase;
+		buildActionMask = 2147483647;
+		files = (
+			7038269C001F40A19E912B72 /* AppDelegate3D.swift in Sources */,
+			9B3C8709002A41139AE80306 /* GameViewController3D.swift in Sources */,
+			085B4AB8003B465398DAB2F0 /* GameScene3D.swift in Sources */,
+			D9E9730A004C4AACA7FB2D40 /* CityMap3D.swift in Sources */,
+			CF123456789ABCDEF0123456 /* ConfigManager.swift in Sources */,
+			EB123456789ABCDEF0123456 /* EnemyBall.swift in Sources */,
+		);
+		runOnlyForDeploymentPostprocessing = 0;
+	};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */

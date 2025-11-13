@@ -98,6 +98,9 @@ class GameViewController3D: UIViewController {
             self?.gameScene.onConfigReceived(config)
         }
         
+        // Setup game over callback
+        setupGameOverCallback()
+        
         // Setup Xbox controller
         setupGameController()
         updateDebugLabel("Controller setup complete")
@@ -426,9 +429,189 @@ class GameViewController3D: UIViewController {
         // Update camera position to follow ball with config values
         gameScene.updateCamera()
         
+        // Update enemy AI
+        gameScene.updateEnemyAI()
+        
         // Update ball movement from controller input (if connected)
         if controller != nil {
             gameScene.updateBallPhysics()
         }
+    }
+    
+    // MARK: - Game Over UI
+    
+    var gameOverView: UIView?
+    var isPaused: Bool = false
+    
+    func setupGameOverCallback() {
+        // Set up callback to be notified when game over occurs
+        gameScene.onGameOver = { [weak self] in
+            self?.showGameOver()
+        }
+    }
+    
+    func showGameOver() {
+        print("🎮 showGameOver() called")
+        
+        // Don't create multiple game over views
+        if gameOverView != nil {
+            print("⚠️ Game over view already exists, ignoring")
+            return
+        }
+        
+        // Pause the game
+        isPaused = true
+        sceneView.scene?.isPaused = true
+        
+        // Create semi-transparent overlay
+        let overlay = UIView(frame: view.bounds)
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        overlay.isUserInteractionEnabled = true  // Enable touch events
+        
+        // Create game over container
+        let containerView = UIView()
+        containerView.backgroundColor = UIColor.darkGray.withAlphaComponent(0.95)
+        containerView.layer.cornerRadius = 20
+        containerView.layer.borderWidth = 3
+        containerView.layer.borderColor = UIColor.red.cgColor
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.isUserInteractionEnabled = true  // Enable touch events
+        
+        // Game over title
+        let titleLabel = UILabel()
+        titleLabel.text = "GAME OVER"
+        titleLabel.font = UIFont.boldSystemFont(ofSize: 48)
+        titleLabel.textColor = .red
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Message label
+        let messageLabel = UILabel()
+        messageLabel.text = "You were caught by an enemy!"
+        messageLabel.font = UIFont.systemFont(ofSize: 20)
+        messageLabel.textColor = .white
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Restart button
+        let restartButton = UIButton(type: .system)
+        restartButton.setTitle("TAP TO RESTART", for: .normal)
+        restartButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 28)
+        restartButton.setTitleColor(.white, for: .normal)
+        restartButton.backgroundColor = UIColor.systemBlue
+        restartButton.layer.cornerRadius = 10
+        restartButton.layer.borderWidth = 3
+        restartButton.layer.borderColor = UIColor.yellow.cgColor
+        restartButton.translatesAutoresizingMaskIntoConstraints = false
+        restartButton.isUserInteractionEnabled = true  // Enable touch events
+        restartButton.addTarget(self, action: #selector(restartGame), for: .touchUpInside)
+        
+        // Add highlight effect for touch feedback
+        restartButton.addTarget(self, action: #selector(buttonTouchDown), for: .touchDown)
+        restartButton.addTarget(self, action: #selector(buttonTouchUp), for: [.touchUpInside, .touchUpOutside])
+        
+        print("✅ Restart button created and target added")
+        
+        // Add subviews
+        containerView.addSubview(titleLabel)
+        containerView.addSubview(messageLabel)
+        containerView.addSubview(restartButton)
+        overlay.addSubview(containerView)
+        view.addSubview(overlay)
+        
+        // Store reference for removal later
+        gameOverView = overlay
+        
+        // Layout constraints
+        NSLayoutConstraint.activate([
+            // Overlay fills entire view
+            overlay.topAnchor.constraint(equalTo: view.topAnchor),
+            overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            // Container centered in overlay
+            containerView.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            containerView.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            containerView.widthAnchor.constraint(equalToConstant: 400),
+            containerView.heightAnchor.constraint(equalToConstant: 300),
+            
+            // Title at top of container
+            titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 40),
+            titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            
+            // Message below title
+            messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            messageLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+            messageLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            
+            // Restart button at bottom
+            restartButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -40),
+            restartButton.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            restartButton.widthAnchor.constraint(equalToConstant: 200),
+            restartButton.heightAnchor.constraint(equalToConstant: 50)
+        ])
+        
+        // Animate in
+        overlay.alpha = 0
+        UIView.animate(withDuration: 0.3) {
+            overlay.alpha = 1.0
+        }
+        
+        print("🎮 Game Over UI displayed")
+    }
+    
+    @objc func buttonTouchDown(_ sender: UIButton) {
+        print("🔵 Button touch DOWN detected!")
+        sender.alpha = 0.5
+    }
+    
+    @objc func buttonTouchUp(_ sender: UIButton) {
+        print("🔵 Button touch UP detected!")
+        sender.alpha = 1.0
+    }
+    
+    @objc func restartGame() {
+        print("🔄🔄🔄 RESTART BUTTON TAPPED! 🔄🔄🔄")
+        NSLog("🔄🔄🔄 RESTART BUTTON TAPPED! 🔄🔄🔄")
+        
+        // Reset game over flag in scene
+        gameScene.resetGameOver()
+        
+        // Remove game over UI
+        if let overlay = self.gameOverView {
+            print("Removing game over view...")
+            UIView.animate(withDuration: 0.2, animations: {
+                overlay.alpha = 0
+            }) { _ in
+                print("Animation complete, removing from superview")
+                overlay.removeFromSuperview()
+                self.gameOverView = nil
+            }
+        } else {
+            print("⚠️ No gameOverView to remove!")
+        }
+        
+        // Unpause the game
+        print("Unpausing game...")
+        isPaused = false
+        sceneView.scene?.isPaused = false
+        
+        // Reset ball position to starting location (top-right corner)
+        print("Resetting ball position...")
+        let mapWidth = Float(gameScene.cityMap.width)
+        let mapHeight = Float(gameScene.cityMap.height)
+        gameScene.ballNode.position = SCNVector3(x: mapWidth - 5, y: 5, z: mapHeight - 5)
+        gameScene.ballNode.physicsBody?.velocity = SCNVector3(0, 0, 0)
+        gameScene.ballNode.physicsBody?.angularVelocity = SCNVector4(0, 0, 0, 0)
+        
+        // Reset enemy positions to corners
+        print("Recreating enemy balls...")
+        gameScene.createEnemyBalls()
+        
+        print("✅✅✅ Game restarted successfully! ✅✅✅")
     }
 }

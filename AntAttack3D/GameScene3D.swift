@@ -12,6 +12,10 @@ class GameScene3D: SCNScene {
     var ambientLightNode: SCNNode!      // Track ambient light to adjust intensity
     weak var sceneView: SCNView?        // Reference to the view for hit testing
     
+    // Enemy AI system
+    var enemyBalls: [EnemyBall] = []
+    var lastEnemyUpdateTime: TimeInterval = 0
+    
     // Camera follow configuration (updated by config server)
     var droneAngle: Float = 45.0        // Down angle in degrees (10-90)
     var droneDistance: Float = 30.0     // Distance from ball
@@ -197,6 +201,10 @@ class GameScene3D: SCNScene {
         // Create the ball
         createBall()
         print("Ball created")
+        
+        // Create enemy balls
+        createEnemyBalls()
+        print("Enemy balls created: \(enemyBalls.count)")
         
         // Send initial visibility state to HUD
         onBallVisibilityChanged?(true)
@@ -728,19 +736,23 @@ class GameScene3D: SCNScene {
         // Create a sphere geometry with radius 0.5 (diameter = 1 block)
         let sphere = SCNSphere(radius: 0.5)
         
-        // Create material for the ball (bright red color)
+        // Create material for the ball (white color)
         let material = SCNMaterial()
-        material.diffuse.contents = UIColor(red: 1.0, green: 0.2, blue: 0.2, alpha: 1.0)  // Bright red
+        material.diffuse.contents = UIColor.white
         material.lightingModel = .lambert
-        material.specular.contents = UIColor.white  // Add some shine
+        material.specular.contents = UIColor(white: 0.9, alpha: 1.0)  // Bright specular highlight
         sphere.materials = [material]
         
         // Create node for the ball
         ballNode = SCNNode(geometry: sphere)
         ballNode.name = "Ball"  // Name it for debugging
         
-        // Position the ball at a starting location (near center, elevated)
-        ballNode.position = SCNVector3(x: 30, y: 5, z: 30)  // Start at center of map, 5 blocks high
+        // Position the ball at a starting location (top-right corner, away from enemies)
+        // Enemies spawn at (5,5), (mapWidth-5, 5), (5, mapHeight-5)
+        // Player spawns at top-right corner
+        let mapWidth = Float(cityMap.width)
+        let mapHeight = Float(cityMap.height)
+        ballNode.position = SCNVector3(x: mapWidth - 5, y: 5, z: mapHeight - 5)  // Top-right corner
         
         // Enable physics for the ball
         let physicsBody = SCNPhysicsBody(type: .dynamic, shape: SCNPhysicsShape(geometry: sphere))
@@ -750,6 +762,7 @@ class GameScene3D: SCNScene {
         physicsBody.rollingFriction = 0.3  // Higher rolling friction for slopes (was 0.2)
         physicsBody.damping = 0.1      // Small air resistance
         physicsBody.angularDamping = 0.1
+        
         ballNode.physicsBody = physicsBody
         
         rootNode.addChildNode(ballNode)
@@ -757,6 +770,55 @@ class GameScene3D: SCNScene {
         // Enable physics on the world
         physicsWorld.speed = 1.0
         physicsWorld.gravity = SCNVector3(0, -98.0, 0)  // Strong gravity (10x Earth gravity) - ball falls immediately
+    }
+    
+    // Create enemy balls in corners
+    func createEnemyBalls() {
+        // Clear any existing enemies
+        enemyBalls.forEach { $0.node.removeFromParentNode() }
+        enemyBalls.removeAll()
+        
+        // Get map dimensions to find corners
+        let mapWidth = Float(cityMap.width)
+        let mapHeight = Float(cityMap.height)
+        
+        // Find ground level at corners (look for first non-block position above ground)
+        let cornerPositions: [(Float, Float)] = [
+            (5, 5),                           // Near bottom-left corner
+            (mapWidth - 5, 5),                // Near bottom-right corner  
+            (5, mapHeight - 5)                // Near top-left corner
+            // Top-right corner reserved for player
+        ]
+        
+        // Create enemy at each corner position
+        for (x, z) in cornerPositions {
+            // Start enemies at ground level + 2 units
+            let position = SCNVector3(x: x, y: 2.0, z: z)
+            let enemy = EnemyBall(position: position)
+            
+            // Add to scene
+            rootNode.addChildNode(enemy.node)
+            enemyBalls.append(enemy)
+            
+            print("🕷️ Enemy ball created at (\(String(format: "%.1f", x)), \(String(format: "%.1f", z)))")
+        }
+    }
+    
+    // Update enemy AI (called every frame)
+    func updateEnemyAI() {
+        let currentTime = CACurrentMediaTime()
+        let deltaTime = currentTime - lastEnemyUpdateTime
+        lastEnemyUpdateTime = currentTime
+        
+        guard let playerPosition = ballNode?.presentation.position else { return }
+        
+        // Update each enemy, passing all enemies so they can avoid each other
+        for enemy in enemyBalls {
+            enemy.update(playerPosition: playerPosition, deltaTime: deltaTime, scene: self, otherEnemies: enemyBalls)
+        }
+        
+        // Check for collision with player
+        checkEnemyCollision()
     }
     
     // Move the ball with controller input (x and z are -1 to 1 range)
@@ -1391,6 +1453,44 @@ class GameScene3D: SCNScene {
         ballNode?.castsShadow = enabled
         
         print("GameScene3D: Shadows \(enabled ? "enabled" : "disabled")")
+    }
+    
+    // MARK: - Collision Detection
+    
+    // Callback for game over event
+    var onGameOver: (() -> Void)?
+    
+    // Flag to prevent multiple game over triggers
+    private var isGameOver = false
+    
+    // Check distance-based collision with enemies
+    func checkEnemyCollision() {
+        // Don't check collisions if game is already over
+        guard !isGameOver else { return }
+        
+        guard let playerPosition = ballNode?.presentation.position else { return }
+        
+        // Check distance to each enemy ball
+        // Ball radius is 1.0, so collision happens when centers are within 2.0 units
+        let collisionDistance: Float = 2.0
+        
+        for enemy in enemyBalls {
+            let enemyPosition = enemy.node.presentation.position
+            let distance = playerPosition.distance(to: enemyPosition)
+            
+            if distance < collisionDistance {
+                print("💥 COLLISION DETECTED: Player hit by enemy at distance \(distance)")
+                isGameOver = true  // Set flag to prevent multiple triggers
+                // Trigger game over
+                onGameOver?()
+                break  // Only trigger once
+            }
+        }
+    }
+    
+    // Reset game over flag (called when restarting)
+    func resetGameOver() {
+        isGameOver = false
     }
 }
 
