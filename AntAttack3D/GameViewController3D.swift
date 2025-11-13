@@ -66,6 +66,10 @@ class GameViewController3D: UIViewController {
         setupConnectionStatusHUD()
         setupVisibilityHUD()
         setupDistanceHUD()
+        
+        // Set initial visibility to hidden (default state)
+        updateDebugHUDVisibility(false)
+        
         updateDebugLabel("HUD setup complete")
         
         // Start configuration server polling
@@ -85,6 +89,13 @@ class GameViewController3D: UIViewController {
         // Setup distance listener
         gameScene.onDistanceChanged = { [weak self] distance in
             self?.updateDistance(distance)
+        }
+        
+        // Setup config update listener for debug HUD visibility AND forward to game scene
+        ConfigManager.shared.onConfigUpdate = { [weak self] config in
+            self?.updateDebugHUDVisibility(config.showDebugHUD)
+            // Forward config update to game scene for camera/lighting updates
+            self?.gameScene.onConfigReceived(config)
         }
         
         // Setup Xbox controller
@@ -149,7 +160,7 @@ class GameViewController3D: UIViewController {
         connectionStatusLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         connectionStatusLabel.textColor = .yellow
         connectionStatusLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        connectionStatusLabel.textAlignment = .left
+        connectionStatusLabel.textAlignment = .center
         connectionStatusLabel.numberOfLines = 1
         connectionStatusLabel.text = " ⏳ Connecting to config server... "
         connectionStatusLabel.layer.cornerRadius = 4
@@ -157,19 +168,21 @@ class GameViewController3D: UIViewController {
         connectionStatusLabel.adjustsFontSizeToFitWidth = true
         connectionStatusLabel.minimumScaleFactor = 0.7
         
-        // Add padding
-        connectionStatusLabel.layoutMargins = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        // Rotate 90 degrees counter-clockwise so text reads vertically along left edge
+        connectionStatusLabel.transform = CGAffineTransform(rotationAngle: -CGFloat.pi / 2)
         
         view.addSubview(connectionStatusLabel)
         
-        // Position at top-left corner with safe area insets
+        // Position on far left edge, just below the time display (top area)
+        // Note: After rotation, width becomes height and vice versa in layout
         NSLayoutConstraint.activate([
-            connectionStatusLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            connectionStatusLabel.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
-            connectionStatusLabel.heightAnchor.constraint(equalToConstant: 24)
+            connectionStatusLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 120), // Below time (12:29), using topAnchor without safeArea
+            connectionStatusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8), // Use view.leadingAnchor to get far left
+            connectionStatusLabel.widthAnchor.constraint(equalToConstant: 200), // Visual height after rotation
+            connectionStatusLabel.heightAnchor.constraint(equalToConstant: 24)   // Visual width after rotation
         ])
         
-        print("GameViewController: HUD label created and added to view")
+        print("GameViewController: HUD label created, rotated 90°, and added to far left edge below time")
     }
     
     func updateConnectionStatus(_ isConnected: Bool, serverURL: String) {
@@ -211,16 +224,20 @@ class GameViewController3D: UIViewController {
         visibilityLabel.adjustsFontSizeToFitWidth = true
         visibilityLabel.minimumScaleFactor = 0.7
         
+        // Rotate 90 degrees counter-clockwise so text reads vertically
+        visibilityLabel.transform = CGAffineTransform(rotationAngle: -CGFloat.pi / 2)
+        
         view.addSubview(visibilityLabel)
         
-        // Position at bottom-right corner with safe area insets
+        // Position on far left edge, below connection status
         NSLayoutConstraint.activate([
-            visibilityLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
-            visibilityLabel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
-            visibilityLabel.heightAnchor.constraint(equalToConstant: 28)
+            visibilityLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 330), // Below connection status
+            visibilityLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8), // Far left
+            visibilityLabel.widthAnchor.constraint(equalToConstant: 140), // Visual height after rotation
+            visibilityLabel.heightAnchor.constraint(equalToConstant: 28)   // Visual width after rotation
         ])
         
-        print("GameViewController: Visibility HUD label created and added to view")
+        print("GameViewController: Visibility HUD label created, rotated 90°, and added to far left edge")
     }
     
     func updateBallVisibility(_ isVisible: Bool) {
@@ -259,16 +276,20 @@ class GameViewController3D: UIViewController {
         distanceLabel.adjustsFontSizeToFitWidth = true
         distanceLabel.minimumScaleFactor = 0.7
         
+        // Rotate 90 degrees counter-clockwise so text reads vertically
+        distanceLabel.transform = CGAffineTransform(rotationAngle: -CGFloat.pi / 2)
+        
         view.addSubview(distanceLabel)
         
-        // Position at bottom-left corner with safe area insets
+        // Position on far left edge, below visibility label
         NSLayoutConstraint.activate([
-            distanceLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
-            distanceLabel.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
-            distanceLabel.heightAnchor.constraint(equalToConstant: 28)
+            distanceLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 480), // Below visibility label
+            distanceLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8), // Far left
+            distanceLabel.widthAnchor.constraint(equalToConstant: 120), // Visual height after rotation
+            distanceLabel.heightAnchor.constraint(equalToConstant: 28)   // Visual width after rotation
         ])
         
-        print("GameViewController: Distance HUD label created and added to view")
+        print("GameViewController: Distance HUD label created, rotated 90°, and added to far left edge")
     }
     
     func updateDistance(_ distance: Float) {
@@ -279,6 +300,21 @@ class GameViewController3D: UIViewController {
             self.distanceLabel.text = String(format: " 📏 Dist: %.1f ", distance)
             self.distanceLabel.textColor = .cyan
             self.distanceLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        }
+    }
+    
+    // MARK: - Debug HUD Visibility Control
+    
+    func updateDebugHUDVisibility(_ shouldShow: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            print("GameViewController: \(shouldShow ? "Showing" : "Hiding") debug HUD elements")
+            
+            // Toggle visibility of all three debug HUD elements
+            self.connectionStatusLabel.isHidden = !shouldShow
+            self.visibilityLabel.isHidden = !shouldShow
+            self.distanceLabel.isHidden = !shouldShow
         }
     }
     
@@ -356,11 +392,14 @@ class GameViewController3D: UIViewController {
                 self?.gameScene.moveBall(x: xValue, z: -yValue)
             }
             
-            // A button to jump
+            // A button for wall climbing (hold to climb)
             gamepad.buttonA.valueChangedHandler = { [weak self] (button, value, pressed) in
                 if pressed {
-                    print("A button pressed - Jump!")
+                    print("A button pressed - Climb mode activated!")
                     self?.gameScene.jumpBall()
+                } else {
+                    print("A button released - Climb mode deactivated!")
+                    self?.gameScene.releaseJump()
                 }
             }
             

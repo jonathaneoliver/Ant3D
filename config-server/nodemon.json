@@ -1,0 +1,7 @@
+{
+  "watch": ["server.js", "public/"],
+  "ext": "js,html,css",
+  "ignore": ["node_modules/", "maps/"],
+  "verbose": false,
+  "delay": 500
+}

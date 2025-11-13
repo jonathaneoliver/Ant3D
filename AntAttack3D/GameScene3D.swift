@@ -21,6 +21,15 @@ class GameScene3D: SCNScene {
     // Controller input state
     private var currentMoveX: Float = 0.0
     private var currentMoveZ: Float = 0.0
+    private var isJumping: Bool = false  // Track if jump button is held down
+    
+    // Slope climbing assistance
+    private var isOnSlope: Bool = false
+    private var slopeNormal: SCNVector3 = SCNVector3(0, 1, 0)
+    private var lastGroundCheckTime: TimeInterval = 0
+    private var isGrounded: Bool = false  // Track if ball is on ground or block
+    private var normalRestitution: CGFloat = 0.3  // Store normal restitution value
+    private var normalFriction: CGFloat = 0.8     // Store normal friction value
     
     // Ball visibility callback
     var onBallVisibilityChanged: ((Bool) -> Void)?
@@ -37,13 +46,22 @@ class GameScene3D: SCNScene {
     private var cameraOrbitAngle: Float = 0.0   // Horizontal angle around ball (0-360 degrees)
     private var isSearchingForBall: Bool = false
     private var framesInCurrentOrbitPosition: Int = 0
-    private let framesBeforeNextOrbit = 30      // Wait 0.5 seconds at each position (at 60fps)
+    private let framesBeforeNextOrbit = 45      // Wait 0.75 seconds at each position (at 60fps) - slower for smoother movement with faster smoothing
     private let orbitStepDegrees: Float = 90.0  // Rotate 90 degrees each step
+    private var orbitSearchStartAngle: Float = 0.0  // Track where orbit search started
+    private var hasCompletedFullRotation: Bool = false  // Has camera rotated 360° without finding ball
+    
+    // Orbit search delay - wait before starting orbit when ball is hidden
+    private var orbitSearchDelay: Float = 2.0   // Seconds to wait (configurable) - reduced for faster response
+    private var hiddenDuration: Float = 0.0     // How long ball has been hidden (seconds)
     
     // Debug counters
     private var updateCameraFrameCount = 0
     private var visibilityRaycastCount = 0
     private var distanceUpdateCount = 0
+    
+    // Config update flag - force immediate camera update when config changes
+    private var forceImmediateCameraUpdate: Bool = false
     
     override init() {
         super.init()
@@ -63,14 +81,82 @@ class GameScene3D: SCNScene {
     }
     
     func setupConfigListener() {
-        // Listen for config updates
+        // NOTE: This callback is overwritten by GameViewController, so we use onConfigReceived() instead
+        // Kept for backwards compatibility in case scene is used standalone
         ConfigManager.shared.onConfigUpdate = { [weak self] config in
-            print("GameScene3D: Received config update - angle: \(config.droneAngle)°, distance: \(config.droneDistance), ambient: \(config.ambientLight), shadows: \(config.shadowsEnabled)")
-            self?.droneAngle = config.droneAngle
-            self?.droneDistance = config.droneDistance
-            self?.updateAmbientLight(config.ambientLight)
-            self?.updateShadows(config.shadowsEnabled)
+            self?.onConfigReceived(config)
         }
+    }
+    
+    // Called when config is received (either from callback or forwarded from view controller)
+    func onConfigReceived(_ config: GameConfig) {
+        print("GameScene3D: Received config update - angle: \(config.droneAngle)°, distance: \(config.droneDistance), ambient: \(config.ambientLight), shadows: \(config.shadowsEnabled), orbitSearchDelay: \(config.orbitSearchDelay)s")
+        
+        // Only force immediate camera update if angle or distance changed
+        let angleChanged = self.droneAngle != config.droneAngle
+        let distanceChanged = self.droneDistance != config.droneDistance
+        
+        if distanceChanged {
+            print("📏 Drone distance changed: \(self.droneDistance) → \(config.droneDistance)")
+        }
+        if angleChanged {
+            print("📐 Drone angle changed: \(self.droneAngle)° → \(config.droneAngle)°")
+        }
+        
+        self.droneAngle = config.droneAngle
+        self.droneDistance = config.droneDistance
+        self.orbitSearchDelay = config.orbitSearchDelay
+        
+        if angleChanged || distanceChanged {
+            self.forceImmediateCameraUpdate = true
+            print("📷 Camera config changed - will apply immediate update on next frame")
+        }
+        
+        self.updateAmbientLight(config.ambientLight)
+        self.updateShadows(config.shadowsEnabled)
+    }
+    
+    // Load map from MapData (supports both blocks and heightMap formats)
+    func loadMap(mapData: MapData) {
+        print("📥 Loading map: \(mapData.name)")
+        
+        // Check if this is a heightMap format (Ant Attack style)
+        if let heightMap = mapData.heightMap {
+            cityMap = CityMap3D(heightMap: heightMap)
+        } else {
+            // Standard blocks format
+            cityMap = CityMap3D(mapData: mapData)
+        }
+        
+        // Re-render the city with new map
+        // Remove old block nodes
+        blockNodes.forEach { $0.removeFromParentNode() }
+        blockNodes.removeAll()
+        
+        // Render new city
+        renderCity()
+        print("✅ Map loaded and rendered: \(mapData.name)")
+        
+        // Update camera to center on new map size
+        updateCameraForMapSize()
+    }
+    
+    // Update camera position to center on current map size
+    func updateCameraForMapSize() {
+        let centerX = Float(cityMap.width) / 2.0
+        let centerZ = Float(cityMap.height) / 2.0
+        
+        // Update camera position to look at new center
+        if let ball = ballNode {
+            // If ball exists, position will be updated by updateCamera
+            updateCamera()
+        } else {
+            // If no ball yet, just center the camera
+            cameraNode.position = SCNVector3(x: centerX, y: 15, z: centerZ + 30)
+            cameraNode.look(at: SCNVector3(x: centerX, y: 10, z: centerZ))
+        }
+        
+        print("🎥 Camera updated for map size: \(cityMap.width)x\(cityMap.height)")
     }
     
     func setupScene() {
@@ -83,9 +169,9 @@ class GameScene3D: SCNScene {
         // Set background color (light cyan like the Python sample)
         background.contents = UIColor(red: 0.59, green: 0.85, blue: 0.93, alpha: 1.0)
         
-        // Create city map (60x60 larger map with many arches)
-        cityMap = CityMap3D(width: 60, height: 60)
-        print("CityMap created")
+        // Create temporary city map (will be replaced with Ant Attack Original)
+        cityMap = CityMap3D(width: 60, height: 60, useAntAttackMap: false)
+        print("Temporary CityMap created (will load Ant Attack Original...)")
         
         // Setup camera
         setupCamera()
@@ -115,6 +201,53 @@ class GameScene3D: SCNScene {
         // Send initial visibility state to HUD
         onBallVisibilityChanged?(true)
         print("🎯 Initial ball visibility set to: VISIBLE ✅")
+        
+        // Load Ant Attack Original map asynchronously
+        loadAntAttackOriginalMap()
+    }
+    
+    // Load the Ant Attack Original map (bundled first, then try server for updates)
+    private func loadAntAttackOriginalMap() {
+        // First, try to load the bundled map (instant, no network required)
+        if let bundledMap = ConfigManager.shared.loadBundledAntAttackMap() {
+            print("✅ Loading bundled Ant Attack Original map: \(bundledMap.width)x\(bundledMap.height)")
+            loadMap(mapData: bundledMap)
+            
+            // Optionally fetch updated version from server in background
+            print("🔄 Checking server for updated map version...")
+            ConfigManager.shared.fetchMap(name: "Ant_Attack_Original") { [weak self] result in
+                switch result {
+                case .success(let serverMap):
+                    print("✅ Server map received, updating to latest version")
+                    self?.loadMap(mapData: serverMap)
+                case .failure(let error):
+                    print("ℹ️  Server unavailable, using bundled map (error: \(error.localizedDescription))")
+                }
+            }
+        } else {
+            // Bundled map failed to load, try server
+            print("⚠️  Bundled map not found, trying server...")
+            ConfigManager.shared.fetchMap(name: "Ant_Attack_Original") { [weak self] result in
+                switch result {
+                case .success(let mapData):
+                    print("✅ Ant Attack Original map loaded from server")
+                    self?.loadMap(mapData: mapData)
+                    
+                case .failure(let error):
+                    print("❌ Failed to load map from both bundle and server: \(error.localizedDescription)")
+                    print("   Using procedurally generated map as final fallback")
+                    // Final fallback: replace temporary map with procedural Ant Attack-style map
+                    DispatchQueue.main.async {
+                        self?.cityMap = CityMap3D(width: 60, height: 60, useAntAttackMap: true)
+                        self?.blockNodes.forEach { $0.removeFromParentNode() }
+                        self?.blockNodes.removeAll()
+                        self?.renderCity()
+                        self?.updateCameraForMapSize()
+                        print("✅ Fallback: Loaded procedural Ant Attack-style map")
+                    }
+                }
+            }
+        }
     }
     
     func setupCamera() {
@@ -419,7 +552,7 @@ class GameScene3D: SCNScene {
         // Add static physics body to ramp
         rampNode.physicsBody = SCNPhysicsBody(type: .static, shape: SCNPhysicsShape(geometry: rampGeometry))
         rampNode.physicsBody?.restitution = 0.1
-        rampNode.physicsBody?.friction = 0.8
+        rampNode.physicsBody?.friction = 1.5  // High friction to help climbing (increased from 0.8)
         
         rootNode.addChildNode(rampNode)
         blockNodes.append(rampNode)
@@ -613,8 +746,8 @@ class GameScene3D: SCNScene {
         let physicsBody = SCNPhysicsBody(type: .dynamic, shape: SCNPhysicsShape(geometry: sphere))
         physicsBody.mass = 1.0
         physicsBody.restitution = 0.3  // Some bounciness
-        physicsBody.friction = 0.5     // Medium friction
-        physicsBody.rollingFriction = 0.2  // Allow rolling
+        physicsBody.friction = 0.8     // Higher friction for better traction on slopes (was 0.5)
+        physicsBody.rollingFriction = 0.3  // Higher rolling friction for slopes (was 0.2)
         physicsBody.damping = 0.1      // Small air resistance
         physicsBody.angularDamping = 0.1
         ballNode.physicsBody = physicsBody
@@ -637,6 +770,9 @@ class GameScene3D: SCNScene {
     func updateBallPhysics() {
         guard let physicsBody = ballNode.physicsBody else { return }
         
+        // Check ground/slope state
+        checkGroundState()
+        
         // Transform input to be camera-relative
         // Convert orbit angle from degrees to radians
         let cameraAngleRadians = cameraOrbitAngle * Float.pi / 180.0
@@ -653,14 +789,246 @@ class GameScene3D: SCNScene {
             print("🎮 Input: x=\(String(format: "%.2f", currentMoveX)), z=\(String(format: "%.2f", currentMoveZ)) | Camera: \(String(format: "%.0f", cameraOrbitAngle))° | World: x=\(String(format: "%.2f", worldX)), z=\(String(format: "%.2f", worldZ))")
         }
         
-        // Apply movement based on camera-relative controller input
+        // Calculate movement direction and speed
         let speed: Float = 8.0  // Units per second
-        let newVelocity = SCNVector3(
-            x: worldX * speed,
-            y: physicsBody.velocity.y,  // Preserve vertical velocity (for jumping/falling)
-            z: worldZ * speed
+        var moveDirection = SCNVector3(x: worldX, y: 0, z: worldZ)
+        
+        // Apply slope climbing assistance if on a slope and moving
+        var dampingFactor: Float = 1.0
+        if isOnSlope && (abs(worldX) > 0.1 || abs(worldZ) > 0.1) {
+            // Calculate how much we're moving up the slope
+            // Dot product of move direction with slope normal tells us if we're moving uphill
+            let normalizedMove = normalize(moveDirection)
+            let upDot = dot(normalizedMove, slopeNormal)
+            
+            // If moving uphill (negative dot product with upward-pointing normal)
+            if upDot < 0 {
+                // Add upward force component to help climb
+                // The steeper the slope, the more force we need
+                let slopeAngle = acos(slopeNormal.y)  // Angle from vertical
+                let climbAssist: Float = tan(slopeAngle) * 40.0  // Increased assist force
+                moveDirection.y = climbAssist
+                
+                if abs(worldX) > 0.1 || abs(worldZ) > 0.1 {
+                    print("⛰️ Climbing slope: angle=\(String(format: "%.1f", slopeAngle * 180.0 / Float.pi))°, assist=\(String(format: "%.1f", climbAssist))")
+                }
+            } else if upDot > 0 {
+                // Going downhill - apply damping to prevent runaway speed
+                dampingFactor = 0.5  // Reduce speed by half when going downhill
+                if abs(worldX) > 0.1 || abs(worldZ) > 0.1 {
+                    print("⬇️ Going downhill - applying damping")
+                }
+            }
+        }
+        
+        // Check for wall climbing mode
+        var climbingWall = false
+        if isJumping {
+            let wallCheck = checkWallAhead()
+            
+            // Only climb if wall is very close (actually touching)
+            if wallCheck.hasWall && wallCheck.distance < 0.6 {
+                climbingWall = true
+                
+                // Set upward velocity for climbing, but KEEP horizontal movement
+                // This allows the ball to move up AND forward, transitioning smoothly to horizontal at the top
+                let climbSpeed: Float = 7.0  // Faster climb speed for responsive wall climbing
+                
+                // IMPORTANT: Set Y velocity directly, don't add to existing
+                // This prevents infinite acceleration upward
+                moveDirection.y = climbSpeed
+                
+                // Constrain horizontal movement to cardinal directions (N/S/E/W) to prevent falling off narrow walls
+                // Snap to the strongest axis
+                if abs(worldX) > abs(worldZ) {
+                    // Moving more in X direction - lock to pure East/West
+                    moveDirection.x = worldX > 0 ? abs(worldX) : -abs(worldX)
+                    moveDirection.z = 0
+                    print("🧗 CLIMBING WALL (E/W locked) - up=\(climbSpeed) units/s, x=\(String(format: "%.2f", moveDirection.x)), distance=\(String(format: "%.2f", wallCheck.distance))")
+                } else {
+                    // Moving more in Z direction - lock to pure North/South
+                    moveDirection.x = 0
+                    moveDirection.z = worldZ > 0 ? abs(worldZ) : -abs(worldZ)
+                    print("🧗 CLIMBING WALL (N/S locked) - up=\(climbSpeed) units/s, z=\(String(format: "%.2f", moveDirection.z)), distance=\(String(format: "%.2f", wallCheck.distance))")
+                }
+            } else if wallCheck.hasWall {
+                print("🧗 Climb mode active, wall detected but too far: \(String(format: "%.2f", wallCheck.distance))")
+            } else {
+                print("🧗 Climb mode active but no wall detected")
+            }
+        }
+        
+        // Apply movement based on camera-relative controller input
+        // Only override Y velocity if climbing wall or on slope needing assist
+        let shouldOverrideY = climbingWall || (isOnSlope && moveDirection.y != 0)
+        
+        if shouldOverrideY {
+            // Climbing or slope assist - set all 3 velocity components
+            let newVelocity = SCNVector3(
+                x: moveDirection.x * speed * dampingFactor,
+                y: moveDirection.y,
+                z: moveDirection.z * speed * dampingFactor
+            )
+            physicsBody.velocity = newVelocity
+        } else {
+            // Normal movement - only set horizontal velocity, let gravity handle Y
+            physicsBody.velocity.x = moveDirection.x * speed * dampingFactor
+            physicsBody.velocity.z = moveDirection.z * speed * dampingFactor
+            // Don't touch velocity.y - let gravity and physics work naturally
+        }
+        
+        // Also apply damping to existing velocity when on a slope going downhill
+        if isOnSlope {
+            let currentVel = physicsBody.velocity
+            let velDot = dot(SCNVector3(x: currentVel.x, y: 0, z: currentVel.z), slopeNormal)
+            if velDot > 0 {
+                // Current velocity is going downhill, apply extra damping
+                physicsBody.velocity = SCNVector3(
+                    x: currentVel.x * 0.9,  // Dampen horizontal velocity
+                    y: currentVel.y,
+                    z: currentVel.z * 0.9
+                )
+            }
+        }
+    }
+    
+    // Check if ball is on ground or slope using raycasting
+    func checkGroundState() {
+        let currentTime = CACurrentMediaTime()
+        // Only check every 0.05 seconds to reduce overhead
+        if currentTime - lastGroundCheckTime < 0.05 {
+            return
+        }
+        lastGroundCheckTime = currentTime
+        
+        guard let ballPosition = ballNode?.presentation.position else { return }
+        
+        // Cast a ray downward from ball center
+        // Ray distance slightly longer than ball radius (0.5) to detect ground contact
+        let rayStart = ballPosition
+        let rayEnd = SCNVector3(x: ballPosition.x, y: ballPosition.y - 0.6, z: ballPosition.z)
+        
+        let hitResults = rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: [
+            SCNHitTestOption.searchMode.rawValue: SCNHitTestSearchMode.all.rawValue,
+            SCNHitTestOption.backFaceCulling.rawValue: false
+        ])
+        
+        // Find first hit that isn't the ball itself
+        for hit in hitResults {
+            if hit.node != ballNode {
+                let normal = hit.worldNormal
+                
+                // Ball is grounded - we hit something below
+                isGrounded = true
+                
+                // Check if we're on a slope (normal not pointing straight up)
+                let verticalDot = abs(normal.y)
+                if verticalDot < 0.98 {  // Not vertical (< ~11 degrees from horizontal)
+                    isOnSlope = true
+                    slopeNormal = normal
+                } else {
+                    isOnSlope = false
+                    slopeNormal = SCNVector3(0, 1, 0)
+                }
+                return
+            }
+        }
+        
+        // No ground detected - ball is in the air
+        isGrounded = false
+        isOnSlope = false
+        slopeNormal = SCNVector3(0, 1, 0)
+    }
+    
+    // Check if there's a wall in front of the ball (in movement direction)
+    func checkWallAhead() -> (hasWall: Bool, distance: Float, normal: SCNVector3) {
+        guard let ballPosition = ballNode?.presentation.position else {
+            print("🔍 Wall check: No ball position")
+            return (false, 0, SCNVector3(0, 1, 0))
+        }
+        
+        // Calculate movement direction in world space (same as updateBallPhysics)
+        let cameraAngleRadians = cameraOrbitAngle * Float.pi / 180.0
+        let worldX = currentMoveX * cos(cameraAngleRadians) + currentMoveZ * sin(cameraAngleRadians)
+        let worldZ = -currentMoveX * sin(cameraAngleRadians) + currentMoveZ * cos(cameraAngleRadians)
+        
+        print("🔍 Wall check: input=(\(String(format: "%.2f", currentMoveX)),\(String(format: "%.2f", currentMoveZ))) world=(\(String(format: "%.2f", worldX)),\(String(format: "%.2f", worldZ)))")
+        
+        // Only check if there's significant horizontal movement
+        if abs(worldX) < 0.1 && abs(worldZ) < 0.1 {
+            print("🔍 Wall check: Movement too small, skipping")
+            return (false, 0, SCNVector3(0, 1, 0))
+        }
+        
+        // Normalize direction
+        let length = sqrt(worldX * worldX + worldZ * worldZ)
+        let dirX = worldX / length
+        let dirZ = worldZ / length
+        
+        // Cast ray forward from ball center to detect walls ahead
+        // Start slightly in front of ball center to avoid hitting the ball itself
+        // Check up to 1.5 units ahead to detect walls before collision
+        let ballRadius: Float = 0.5
+        let rayStartOffset: Float = 0.2  // Start ray just ahead of ball center
+        let checkDistance: Float = 1.5   // Check further ahead for early wall detection
+        let rayHeight: Float = 0.5       // Raise ray above ground to avoid hitting ground plane
+        let rayStart = SCNVector3(
+            x: ballPosition.x + dirX * rayStartOffset,
+            y: ballPosition.y + rayHeight,
+            z: ballPosition.z + dirZ * rayStartOffset
         )
-        physicsBody.velocity = newVelocity
+        let rayEnd = SCNVector3(
+            x: ballPosition.x + dirX * (rayStartOffset + checkDistance),
+            y: ballPosition.y + rayHeight,
+            z: ballPosition.z + dirZ * (rayStartOffset + checkDistance)
+        )
+        
+        print("🔍 Wall check: Raycast from (\(String(format: "%.1f", rayStart.x)),\(String(format: "%.1f", rayStart.y)),\(String(format: "%.1f", rayStart.z))) to (\(String(format: "%.1f", rayEnd.x)),\(String(format: "%.1f", rayEnd.y)),\(String(format: "%.1f", rayEnd.z)))")
+        
+        let hitResults = rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: [
+            SCNHitTestOption.searchMode.rawValue: SCNHitTestSearchMode.closest.rawValue,
+            SCNHitTestOption.backFaceCulling.rawValue: false
+        ])
+        
+        print("🔍 Wall check: Found \(hitResults.count) hits")
+        
+        // Find first hit that isn't the ball
+        for hit in hitResults {
+            if hit.node != ballNode {
+                let normal = hit.worldNormal
+                
+                // Check if this is a vertical wall (normal pointing mostly horizontal)
+                let horizontalDot = sqrt(normal.x * normal.x + normal.z * normal.z)
+                print("🔍 Hit: node=\(hit.node.name ?? "unnamed"), normal=(\(String(format: "%.2f", normal.x)),\(String(format: "%.2f", normal.y)),\(String(format: "%.2f", normal.z))), horizontalDot=\(String(format: "%.2f", horizontalDot))")
+                
+                if horizontalDot > 0.7 {  // More than 45 degrees from horizontal = wall
+                    let distance = sqrt(
+                        pow(hit.worldCoordinates.x - ballPosition.x, 2) +
+                        pow(hit.worldCoordinates.z - ballPosition.z, 2)
+                    )
+                    print("✅ Found wall! distance=\(String(format: "%.2f", distance))")
+                    return (true, distance, normal)
+                } else {
+                    print("❌ Hit is not a wall (horizontalDot=\(String(format: "%.2f", horizontalDot)) <= 0.7)")
+                }
+            }
+        }
+        
+        print("🔍 Wall check: No wall found")
+        return (false, 0, SCNVector3(0, 1, 0))
+    }
+    
+    // Vector math helpers
+    func normalize(_ v: SCNVector3) -> SCNVector3 {
+        let length = sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+        if length > 0.0001 {
+            return SCNVector3(x: v.x / length, y: v.y / length, z: v.z / length)
+        }
+        return SCNVector3(0, 0, 0)
+    }
+    
+    func dot(_ a: SCNVector3, _ b: SCNVector3) -> Float {
+        return a.x * b.x + a.y * b.y + a.z * b.z
     }
     
     // Move the ball with direct velocity (legacy method for other controls)
@@ -678,15 +1046,42 @@ class GameScene3D: SCNScene {
         physicsBody.velocity = newVelocity
     }
     
-    // Jump the ball - just enough to clear 1 block height
+    // Start wall-climbing/scrambling mode
+    // Ball will climb up vertical walls when moving into them
     func jumpBall() {
         guard let physicsBody = ballNode.physicsBody else { return }
         
-        // Apply upward impulse calculated to reach 1 block (1 unit) height
-        // With gravity -98.0 and mass 1.0: v = sqrt(2 * 98.0 * 1.0) ≈ 14.0
-        // Using impulse: force = mass * velocity = 1.0 * 14.0
-        let jumpForce = SCNVector3(0, 14.0, 0)
-        physicsBody.applyForce(jumpForce, asImpulse: true)
+        // Set jumping state
+        isJumping = true
+        
+        // Reduce restitution to prevent bouncing off walls during climb
+        physicsBody.restitution = 0.0
+        
+        // Increase friction to help stick to walls during climb
+        physicsBody.friction = 2.0
+        
+        print("🧗 CLIMB MODE ACTIVATED - restitution=0.0, friction=2.0 to prevent bounce")
+    }
+    
+    // Stop wall-climbing mode
+    func releaseJump() {
+        guard let physicsBody = ballNode.physicsBody else { return }
+        
+        // Clear jumping state
+        isJumping = false
+        
+        // Cancel any upward velocity immediately - let gravity take over
+        // This prevents the ball from floating after releasing climb button
+        if physicsBody.velocity.y > 0 {
+            physicsBody.velocity.y = 0
+            print("🧗 CLIMB MODE DEACTIVATED - cancelled upward velocity, gravity restored")
+        } else {
+            print("🧗 CLIMB MODE DEACTIVATED - normal physics restored")
+        }
+        
+        // Restore normal restitution and friction
+        physicsBody.restitution = normalRestitution
+        physicsBody.friction = normalFriction
     }
     
     // Update camera to follow ball (call this every frame)
@@ -725,17 +1120,35 @@ class GameScene3D: SCNScene {
         // When not searching: keep current angle (wherever ball was found)
         
         if isSearchingForBall {
-            // ORBIT MODE: Increment frame counter and rotate to next position when ready
-            framesInCurrentOrbitPosition += 1
-            
-            // Check if it's time to rotate to next position
-            if framesInCurrentOrbitPosition >= framesBeforeNextOrbit {
-                cameraOrbitAngle += orbitStepDegrees
-                if cameraOrbitAngle >= 360.0 {
-                    cameraOrbitAngle = 0.0
+            // Check if we've already completed a full rotation without finding ball
+            if hasCompletedFullRotation {
+                // Ball is completely occluded, stop searching and keep current angle
+                // Don't continue orbiting - the ball won't become visible
+                print("⚠️  Ball remains hidden after 360° rotation - stopping orbit search")
+            } else {
+                // ORBIT MODE: Increment frame counter and rotate to next position when ready
+                framesInCurrentOrbitPosition += 1
+                
+                // Check if it's time to rotate to next position
+                if framesInCurrentOrbitPosition >= framesBeforeNextOrbit {
+                    cameraOrbitAngle += orbitStepDegrees
+                    if cameraOrbitAngle >= 360.0 {
+                        cameraOrbitAngle = 0.0
+                    }
+                    framesInCurrentOrbitPosition = 0
+                    
+                    // Check if we've completed a full 360° rotation
+                    let totalRotation = cameraOrbitAngle - orbitSearchStartAngle
+                    let normalizedRotation = totalRotation < 0 ? totalRotation + 360.0 : totalRotation
+                    
+                    if normalizedRotation >= 360.0 || (normalizedRotation >= 0 && normalizedRotation < orbitStepDegrees && cameraOrbitAngle != orbitSearchStartAngle) {
+                        // We've rotated a full circle and ball is still hidden
+                        hasCompletedFullRotation = true
+                        print("🔄 Completed 360° rotation without finding ball - stopping search")
+                    } else {
+                        print("🔄 Orbiting to next position: \(String(format: "%.0f", cameraOrbitAngle))° (rotated \(String(format: "%.0f", normalizedRotation))° so far)")
+                    }
                 }
-                framesInCurrentOrbitPosition = 0
-                print("🔄 Orbiting to next position: \(String(format: "%.0f", cameraOrbitAngle))°")
             }
         }
         // In normal mode, we keep the current cameraOrbitAngle (don't change it)
@@ -749,13 +1162,25 @@ class GameScene3D: SCNScene {
         let targetPosition = SCNVector3(x: targetCameraX, y: targetCameraY, z: targetCameraZ)
         
         // Smooth camera movement to avoid jerkiness
-        // Use slower smoothing during orbit search for smoother transitions
-        let smoothingXZ: Float = isSearchingForBall ? 0.08 : 0.2  // Slower when searching
-        let smoothingY: Float = 0.1  // Slow vertical tracking
+        // Use faster smoothing during orbit search for more responsive movement
+        // Use immediate update if config changed
+        let smoothingXZ: Float = forceImmediateCameraUpdate ? 1.0 : (isSearchingForBall ? 0.25 : 0.3)
+        let smoothingY: Float = forceImmediateCameraUpdate ? 1.0 : 0.2
         
         cameraNode.position.x += (targetPosition.x - cameraNode.position.x) * smoothingXZ
         cameraNode.position.y += (targetPosition.y - cameraNode.position.y) * smoothingY
         cameraNode.position.z += (targetPosition.z - cameraNode.position.z) * smoothingXZ
+        
+        // Clear the force update flag after applying
+        if forceImmediateCameraUpdate {
+            forceImmediateCameraUpdate = false
+            print("📷 Applied immediate camera position update from config change")
+            print("   New camera position: (\(String(format: "%.1f", cameraNode.position.x)), \(String(format: "%.1f", cameraNode.position.y)), \(String(format: "%.1f", cameraNode.position.z)))")
+            print("   Target distance: \(droneDistance), angle: \(droneAngle)°")
+            
+            // Force SceneKit to render the new camera position immediately
+            sceneView?.setNeedsDisplay()
+        }
         
         // Calculate actual distance from camera to ball
         let dx = cameraNode.position.x - ballPosition.x
@@ -801,25 +1226,45 @@ class GameScene3D: SCNScene {
             
             // Handle search mode transitions
             if !isVisible && !isSearchingForBall {
-                // Ball just became hidden -> start searching
+                // Ball just became hidden -> reset hidden duration timer
+                hiddenDuration = 0.0
+                print("⏱️  Ball hidden - starting delay timer (\(String(format: "%.1f", orbitSearchDelay))s)")
+            } else if isVisible && isSearchingForBall {
+                // Ball just became visible -> stop searching (keep current angle)
+                isSearchingForBall = false
+                framesInCurrentOrbitPosition = 0
+                hasCompletedFullRotation = false  // Reset for next search
+                hiddenDuration = 0.0  // Reset timer
+                print("✅ ORBIT SEARCH COMPLETE - Ball found at \(String(format: "%.0f", cameraOrbitAngle))°")
+            } else if isVisible {
+                // Ball is visible -> reset hidden duration
+                hiddenDuration = 0.0
+            }
+        }
+        
+        // Accumulate hidden duration and start orbit search after delay
+        if !lastVisibilityState && !isSearchingForBall {
+            // Ball is hidden but search hasn't started yet
+            hiddenDuration += 1.0 / 60.0  // Assume 60fps (approximately 0.0167s per frame)
+            
+            if hiddenDuration >= orbitSearchDelay {
+                // Delay period has elapsed -> start orbit search
                 isSearchingForBall = true
                 framesInCurrentOrbitPosition = 0
+                hasCompletedFullRotation = false  // Reset rotation tracking
                 // Initialize orbit angle to current camera angle relative to ball
                 let currentDx = cameraNode.position.x - ballPosition.x
                 let currentDz = cameraNode.position.z - ballPosition.z
                 cameraOrbitAngle = atan2(currentDx, currentDz) * 180.0 / Float.pi
                 if cameraOrbitAngle < 0 { cameraOrbitAngle += 360.0 }
-                print("🔍 STARTING ORBIT SEARCH at \(String(format: "%.0f", cameraOrbitAngle))°")
-            } else if isVisible && isSearchingForBall {
-                // Ball just became visible -> stop searching (keep current angle)
-                isSearchingForBall = false
-                framesInCurrentOrbitPosition = 0
-                print("✅ ORBIT SEARCH COMPLETE - Ball found at \(String(format: "%.0f", cameraOrbitAngle))°")
+                orbitSearchStartAngle = cameraOrbitAngle  // Remember where we started
+                print("🔍 STARTING ORBIT SEARCH at \(String(format: "%.0f", cameraOrbitAngle))° (after \(String(format: "%.1f", hiddenDuration))s delay)")
             }
         }
         
-        // Look directly at the ball
-        cameraNode.look(at: ballPosition)
+        // Look directly at the ball with horizon stabilization
+        // Using look(at:up:localFront:) to keep the horizon level
+        cameraNode.look(at: ballPosition, up: SCNVector3(0, 1, 0), localFront: SCNVector3(0, 0, -1))
         
         // Update directional light to follow the ball (keep it above the ball for consistent lighting)
         let lightX = ballPosition.x
@@ -833,7 +1278,7 @@ class GameScene3D: SCNScene {
     // Uses screen-space hit testing to check if ball is actually visible in rendered view
     func isBallVisibleFromPosition(_ cameraPos: SCNVector3, ballPosition: SCNVector3) -> Bool {
         visibilityRaycastCount += 1
-        let shouldLog = (visibilityRaycastCount <= 15 || visibilityRaycastCount % 120 == 0)
+        let shouldLog = (visibilityRaycastCount % 300 == 0)
         
         if shouldLog {
             print("🔍 Visibility check #\(visibilityRaycastCount)")
