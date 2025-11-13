@@ -473,7 +473,7 @@ class GameViewController3D: UIViewController {
         
         // Restart button
         let restartButton = UIButton(type: .system)
-        restartButton.setTitle("TAP TO RESTART", for: .normal)
+        restartButton.setTitle("PLAY AGAIN", for: .normal)
         restartButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 28)
         restartButton.setTitleColor(.white, for: .normal)
         restartButton.backgroundColor = UIColor.systemBlue
