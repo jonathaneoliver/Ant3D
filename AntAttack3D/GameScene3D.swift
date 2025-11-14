@@ -19,6 +19,19 @@ class GameScene3D: SCNScene {
     var enemyBalls: [EnemyBall] = []
     var lastEnemyUpdateTime: TimeInterval = 0
     
+    // Hostage rescue system
+    var hostages: [Hostage] = []
+    var safeMatPosition: SCNVector3 = SCNVector3Zero
+    var safeMatRadius: Float = 3.0
+    var score: Int = 0
+    var onScoreChanged: ((Int) -> Void)?  // Callback for score updates
+    
+    // Level progression system
+    var currentLevel: Int = 1
+    var baseHostageCount: Int = 3  // Starting number of hostages
+    var baseEnemyCount: Int = 3    // Starting number of enemies
+    var onLevelComplete: ((Int) -> Void)?  // Callback when level is complete (passes new level number)
+    
     // OPTIMIZATION: Shared materials and geometry for all blocks (memory and performance improvement)
     private var sharedBlockGeometry: SCNBox!
     private var sharedBlockMaterials: [SCNMaterial] = []
@@ -46,6 +59,7 @@ class GameScene3D: SCNScene {
     // Ball visibility callback
     var onBallVisibilityChanged: ((Bool) -> Void)?
     var onDistanceChanged: ((Float) -> Void)?
+    var onHostageCountChanged: ((Int, Int) -> Void)?  // Callback for hostage count updates (saved, total)
     private var lastVisibilityState: Bool = true
     private var visibilityCheckFrameCount: Int = 0
     
@@ -192,6 +206,9 @@ class GameScene3D: SCNScene {
         
         // Create enemy balls
         createEnemyBalls()
+        
+        // Create hostages to rescue
+        createHostages()
         
         // Send initial visibility state to HUD
         onBallVisibilityChanged?(true)
@@ -756,9 +773,178 @@ class GameScene3D: SCNScene {
         
         rootNode.addChildNode(ballNode)
         
+        // Create safe mat marker at player's starting position
+        createSafeMat(at: SCNVector3(x: mapWidth - 5, y: 0, z: mapHeight - 5))
+        
         // Enable physics on the world
         physicsWorld.speed = 1.0
         physicsWorld.gravity = SCNVector3(0, -150.0, 0)  // Very strong gravity for fast falling/jumping
+    }
+    
+    // Create safe mat marker at player's starting position
+    func createSafeMat(at position: SCNVector3) {
+        // Create a square floor mat (6x6 units to cover the spawn area)
+        let matSize: CGFloat = 6.0
+        let mat = SCNPlane(width: matSize, height: matSize)
+        
+        // Light blue semi-transparent material for the safe zone
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor(red: 0.3, green: 0.7, blue: 1.0, alpha: 0.4)  // Light blue
+        material.lightingModel = .lambert
+        material.isDoubleSided = true  // Visible from both sides
+        mat.materials = [material]
+        
+        // Create node and position it
+        let matNode = SCNNode(geometry: mat)
+        matNode.name = "SafeMat"
+        matNode.position = position
+        
+        // Rotate to lie flat on the ground (plane is vertical by default)
+        matNode.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)
+        
+        // Add to scene
+        rootNode.addChildNode(matNode)
+        
+        // Store reference for collision detection later
+        self.safeMatPosition = position
+        self.safeMatRadius = Float(matSize / 2)
+    }
+    
+    // Spawn hostages on raised blocks (safe from ground enemies)
+    func createHostages() {
+        // Clear any existing hostages
+        hostages.forEach { $0.node.removeFromParentNode() }
+        hostages.removeAll()
+        
+        // Find suitable spawn positions (standing on blocks at z=1)
+        var candidatePositions: [SCNVector3] = []
+        
+        print("🔍 DEBUG: Searching for hostage spawn positions...")
+        print("🔍 DEBUG: Map size: \(cityMap.width) x \(cityMap.height)")
+        
+        // Look for blocks at z=1 to place hostages on top
+        var blocksAtZ1 = 0
+        var blocksWithSpaceAbove = 0
+        var blocksNearPlayer = 0
+        
+        for x in 0..<cityMap.width {
+            for y in 0..<cityMap.height {
+                // Check if there's a block at z=1
+                if cityMap.hasBlock(x: x, y: y, z: 1) {
+                    blocksAtZ1 += 1
+                    
+                    // Make sure there's space at z=2 and z=3 (hostage needs room to stand)
+                    if !cityMap.hasBlock(x: x, y: y, z: 2) && 
+                       !cityMap.hasBlock(x: x, y: y, z: 3) {
+                        blocksWithSpaceAbove += 1
+                        
+                        // Position hostage above the z=1 block so it falls down
+                        // Block at z=1 is positioned at y=1.5, so top of block is at y=2.0
+                        // Spawn hostage at y=3.0 so it falls and lands at y=2.5 (resting on block)
+                        let position = SCNVector3(
+                            x: Float(x),
+                            y: 3.0,  // Spawn above block to let physics settle
+                            z: Float(y)
+                        )
+                        
+                        // Make sure it's not too close to player start
+                        let playerStart = SCNVector3(
+                            x: Float(cityMap.width) - 5,
+                            y: 0,
+                            z: Float(cityMap.height) - 5
+                        )
+                        let dx = position.x - playerStart.x
+                        let dz = position.z - playerStart.z
+                        let distToPlayer = sqrt(dx*dx + dz*dz)
+                        
+                        if distToPlayer > 10.0 {  // At least 10 units away from start
+                            candidatePositions.append(position)
+                        } else {
+                            blocksNearPlayer += 1
+                        }
+                    }
+                }
+            }
+        }
+        
+        print("🔍 DEBUG: Blocks at z=1: \(blocksAtZ1)")
+        print("🔍 DEBUG: Blocks with clear space above: \(blocksWithSpaceAbove)")
+        print("🔍 DEBUG: Blocks too near player (rejected): \(blocksNearPlayer)")
+        print("🔍 DEBUG: Valid candidate positions: \(candidatePositions.count)")
+        
+        // If no candidates at z=1, try z=0 (ground level)
+        if candidatePositions.isEmpty {
+            print("⚠️ No valid z=1 positions, trying z=0 (ground level)...")
+            for x in 0..<cityMap.width {
+                for y in 0..<cityMap.height {
+                    // Check if there's a block at z=0 (ground)
+                    if cityMap.hasBlock(x: x, y: y, z: 0) {
+                        // Make sure there's space at z=1 and z=2 (hostage needs room to stand)
+                        if !cityMap.hasBlock(x: x, y: y, z: 1) && 
+                           !cityMap.hasBlock(x: x, y: y, z: 2) {
+                            // Spawn hostage above ground block so it falls down
+                            // Block at z=0 is positioned at y=0.5, top at y=1.0
+                            // Spawn at y=1.5 so it falls and lands at y=1.5 (resting on block)
+                            let position = SCNVector3(
+                                x: Float(x),
+                                y: 1.5,  // Spawn above ground block to let physics settle
+                                z: Float(y)
+                            )
+                            
+                            let playerStart = SCNVector3(
+                                x: Float(cityMap.width) - 5,
+                                y: 0,
+                                z: Float(cityMap.height) - 5
+                            )
+                            let dx = position.x - playerStart.x
+                            let dz = position.z - playerStart.z
+                            let distToPlayer = sqrt(dx*dx + dz*dz)
+                            
+                            if distToPlayer > 10.0 {
+                                candidatePositions.append(position)
+                            }
+                        }
+                    }
+                }
+            }
+            print("🔍 DEBUG: Found \(candidatePositions.count) ground-level positions")
+        }
+        
+        // Spawn 3-5 hostages randomly from candidate positions
+        // Number increases by 1 each level
+        let numHostages = baseHostageCount + (currentLevel - 1)
+        let actualNumHostages = min(candidatePositions.count, numHostages)
+        let shuffled = candidatePositions.shuffled()
+        
+        for i in 0..<actualNumHostages {
+            let spawnPos = shuffled[i]
+            let hostage = Hostage(position: spawnPos)
+            rootNode.addChildNode(hostage.node)
+            hostages.append(hostage)
+            
+            // Debug: Verify blocks exist at this location
+            let gridX = Int(spawnPos.x)
+            let gridZ = Int(spawnPos.z)
+            let hasZ0 = cityMap.hasBlock(x: gridX, y: gridZ, z: 0)
+            let hasZ1 = cityMap.hasBlock(x: gridX, y: gridZ, z: 1)
+            let hasZ2 = cityMap.hasBlock(x: gridX, y: gridZ, z: 2)
+            print("✅ Hostage \(i+1) spawned at: \(spawnPos)")
+            print("   Grid coords: (\(gridX), \(gridZ))")
+            print("   Blocks: z=0:\(hasZ0 ? "YES" : "NO"), z=1:\(hasZ1 ? "YES" : "NO"), z=2:\(hasZ2 ? "NO" : "YES")")
+            
+            // Log final position after physics settles (wait 1 second)
+            let waitAction = SCNAction.wait(duration: 1.0)
+            let logAction = SCNAction.run { _ in
+                let finalPos = hostage.node.presentation.position
+                print("   📍 Hostage \(i+1) settled at y=\(String(format: "%.2f", finalPos.y))")
+            }
+            hostage.node.runAction(SCNAction.sequence([waitAction, logAction]))
+        }
+        
+        print("🎯 Spawned \(hostages.count) total hostages")
+        
+        // Initialize HUD
+        onHostageCountChanged?(0, hostages.count)
     }
     
     // Create enemy balls in corners
@@ -775,12 +961,20 @@ class GameScene3D: SCNScene {
         let cornerPositions: [(Float, Float)] = [
             (5, 5),                           // Near bottom-left corner
             (mapWidth - 5, 5),                // Near bottom-right corner  
-            (5, mapHeight - 5)                // Near top-left corner
+            (5, mapHeight - 5),               // Near top-left corner
+            (mapWidth / 2, 5),                // Middle-bottom (for level 4+)
+            (5, mapHeight / 2),               // Middle-left (for level 5+)
+            (mapWidth - 5, mapHeight / 2)     // Middle-right (for level 6+)
             // Top-right corner reserved for player
         ]
         
+        // Calculate how many enemies for this level
+        let numEnemies = baseEnemyCount + (currentLevel - 1)
+        let actualNumEnemies = min(numEnemies, cornerPositions.count)
+        
         // Create enemy at each corner position
-        for (x, z) in cornerPositions {
+        for i in 0..<actualNumEnemies {
+            let (x, z) = cornerPositions[i]
             // Start enemies at ground level + 2 units
             let position = SCNVector3(x: x, y: 2.0, z: z)
             let enemy = EnemyBall(position: position)
@@ -788,8 +982,9 @@ class GameScene3D: SCNScene {
             // Add to scene
             rootNode.addChildNode(enemy.node)
             enemyBalls.append(enemy)
-            
         }
+        
+        print("🎮 Level \(currentLevel): Spawned \(actualNumEnemies) enemies")
     }
     
     // Update enemy AI (called every frame)
@@ -807,6 +1002,80 @@ class GameScene3D: SCNScene {
         
         // Check for collision with player
         checkEnemyCollision()
+    }
+    
+    // Update hostages - check for player collision and follow behavior
+    func updateHostages() {
+        guard let playerPosition = ballNode?.presentation.position else { return }
+        
+        for hostage in hostages {
+            switch hostage.state {
+            case .waiting:
+                // Check if player is close enough to rescue this hostage
+                let hostagePos = hostage.node.presentation.position
+                let dx = playerPosition.x - hostagePos.x
+                let dy = playerPosition.y - hostagePos.y
+                let dz = playerPosition.z - hostagePos.z
+                let distance = sqrt(dx*dx + dy*dy + dz*dz)
+                
+                if distance < 2.0 {  // Player within 2 units = rescue!
+                    hostage.state = .following
+                    print("Hostage rescued! Following player...")
+                    
+                    // Update HUD
+                    let savedCount = hostages.filter { $0.state == .saved }.count
+                    onHostageCountChanged?(savedCount, hostages.count)
+                }
+                
+            case .following:
+                // Update follow behavior
+                hostage.update(playerPosition: playerPosition)
+                
+                // Check if hostage reached the safe mat
+                let hostagePos = hostage.node.presentation.position
+                let dx = hostagePos.x - safeMatPosition.x
+                let dz = hostagePos.z - safeMatPosition.z
+                let distToMat = sqrt(dx*dx + dz*dz)
+                
+                if distToMat < safeMatRadius {
+                    hostage.state = .saved
+                    
+                    // Add 1000 points for saving this hostage
+                    score += 1000
+                    print("Hostage saved! +1000 points (Total: \(score))")
+                    
+                    // Make hostage vanish with fade animation
+                    let fadeOut = SCNAction.fadeOut(duration: 0.5)
+                    let remove = SCNAction.removeFromParentNode()
+                    let sequence = SCNAction.sequence([fadeOut, remove])
+                    hostage.node.runAction(sequence)
+                    
+                    // Update HUD
+                    let savedCount = hostages.filter { $0.state == .saved }.count
+                    onHostageCountChanged?(savedCount, hostages.count)
+                    onScoreChanged?(score)
+                    
+                    // Check if all hostages are saved (level complete!)
+                    if hostages.allSatisfy({ $0.state == .saved }) {
+                        print("🎉 LEVEL \(currentLevel) COMPLETE! 🎉")
+                        print("Final Score: \(score)")
+                        
+                        // Increment level and trigger callback
+                        currentLevel += 1
+                        onLevelComplete?(currentLevel)
+                        
+                        // Wait 2 seconds, then restart with next level
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                            self?.restartLevel()
+                        }
+                    }
+                }
+                
+            case .saved:
+                // Hostage is safe, no more updates needed
+                break
+            }
+        }
     }
     
     // Move the ball with controller input (x and z are -1 to 1 range)
@@ -1422,26 +1691,93 @@ class GameScene3D: SCNScene {
         guard let playerPosition = ballNode?.presentation.position else { return }
         
         // Check distance to each enemy ball
-        // Ball radius is 1.0, so collision happens when centers are within 2.0 units
-        let collisionDistance: Float = 2.0
+        // Both player and enemy have radius 0.5, so they're touching when centers are 1.0 units apart
+        // Use slightly larger distance (1.1) to account for physics/movement
+        let collisionDistance: Float = 1.1
         
         for enemy in enemyBalls {
             let enemyPosition = enemy.node.presentation.position
             let distance = playerPosition.distance(to: enemyPosition)
             
             if distance < collisionDistance {
-                logger.info("Enemy collision detected")
-                isGameOver = true  // Set flag to prevent multiple triggers
-                // Trigger game over
-                onGameOver?()
-                break  // Only trigger once
+                // Distance is close - now check line of sight to prevent catching through walls
+                if hasLineOfSight(from: enemyPosition, to: playerPosition) {
+                    logger.info("Enemy collision detected - caught by enemy!")
+                    isGameOver = true  // Set flag to prevent multiple triggers
+                    // Trigger game over
+                    onGameOver?()
+                    break  // Only trigger once
+                }
             }
         }
+    }
+    
+    // Check if there's a clear line of sight between two positions (no blocks in the way)
+    private func hasLineOfSight(from start: SCNVector3, to end: SCNVector3) -> Bool {
+        // Use raycast to check for obstacles between enemy and player
+        let rayStart = start
+        let rayEnd = end
+        
+        // Perform raycast test
+        let hitResults = rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: nil)
+        
+        // Filter out hits with enemy balls, hostages, and the player ball itself
+        // Only care about blocks (obstacles)
+        for hit in hitResults {
+            if let nodeName = hit.node.name {
+                // Ignore hits with player, enemies, hostages, safe mat
+                if nodeName == "Ball" || nodeName.contains("Enemy") || nodeName == "Hostage" || nodeName == "SafeMat" {
+                    continue
+                }
+            }
+            // If we hit something else (a block), there's no line of sight
+            return false
+        }
+        
+        // No obstacles found - clear line of sight
+        return true
     }
     
     // Reset game over flag (called when restarting)
     func resetGameOver() {
         isGameOver = false
+    }
+    
+    // Restart level with current difficulty (incremented hostages and enemies)
+    func restartLevel() {
+        print("🔄 Restarting with Level \(currentLevel)...")
+        
+        // Reset game over flag
+        isGameOver = false
+        
+        // Reset player position to starting location
+        let mapWidth = Float(cityMap.width)
+        let mapHeight = Float(cityMap.height)
+        let startPosition = SCNVector3(x: mapWidth - 5, y: 5, z: mapHeight - 5)
+        ballNode?.position = startPosition
+        ballNode?.physicsBody?.velocity = SCNVector3Zero
+        ballNode?.physicsBody?.angularVelocity = SCNVector4Zero
+        
+        // Recreate enemies with new count
+        createEnemyBalls()
+        
+        // Recreate hostages with new count
+        createHostages()
+        
+        print("✅ Level \(currentLevel) started: \(hostages.count) hostages, \(enemyBalls.count) enemies")
+    }
+    
+    // Rotate camera by 45 degrees around the ball
+    func rotateCameraView() {
+        // Increment orbit angle by 45 degrees
+        cameraOrbitAngle += 45.0
+        
+        // Normalize to 0-360 range
+        if cameraOrbitAngle >= 360.0 {
+            cameraOrbitAngle -= 360.0
+        }
+        
+        print("🎥 Camera rotated to \(cameraOrbitAngle)°")
     }
 }
 

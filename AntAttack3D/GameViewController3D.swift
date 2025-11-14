@@ -14,6 +14,12 @@ class GameViewController3D: UIViewController {
     var debugLabel: UILabel!  // Big visible debug label
     var visibilityLabel: UILabel!  // Ball visibility indicator
     var distanceLabel: UILabel!  // Camera distance from ball
+    var hostageLabel: UILabel!  // Hostage rescue counter
+    var scoreLabel: UILabel!  // Score display
+    var levelLabel: UILabel!  // Current level display
+    var miniMapView: UIView!  // Mini-map showing hostage locations
+    var miniMapDots: [UIView] = []  // Blue dots for hostages
+    var miniMapPlayerDot: UIView?  // Red dot for player position
     var axisView: SCNView!  // 3D axis indicator
     var controller: GCController?
     
@@ -64,6 +70,10 @@ class GameViewController3D: UIViewController {
         setupConnectionStatusHUD()
         setupVisibilityHUD()
         setupDistanceHUD()
+        setupScoreHUD()
+        setupLevelHUD()
+        setupHostageHUD()
+        setupMiniMap()
         
         // Set initial visibility to hidden (default state)
         updateDebugHUDVisibility(false)
@@ -87,6 +97,23 @@ class GameViewController3D: UIViewController {
         // Setup distance listener
         gameScene.onDistanceChanged = { [weak self] distance in
             self?.updateDistance(distance)
+        }
+        
+        // Setup hostage count listener
+        gameScene.onHostageCountChanged = { [weak self] saved, total in
+            self?.updateHostageCount(saved, total)
+        }
+        
+        // Setup score listener
+        gameScene.onScoreChanged = { [weak self] score in
+            self?.updateScore(score)
+        }
+        
+        // Setup level complete listener
+        gameScene.onLevelComplete = { [weak self] newLevel in
+            self?.updateLevel(newLevel)
+            // Show "Level Complete!" message
+            self?.showLevelCompleteMessage()
         }
         
         // Setup config update listener for debug HUD visibility AND forward to game scene
@@ -290,6 +317,239 @@ class GameViewController3D: UIViewController {
         }
     }
     
+    // MARK: - Hostage Rescue HUD
+    
+    func setupHostageHUD() {
+        
+        // Create hostage label
+        hostageLabel = UILabel()
+        hostageLabel.translatesAutoresizingMaskIntoConstraints = false
+        hostageLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        hostageLabel.textColor = .cyan
+        hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        hostageLabel.textAlignment = .center
+        hostageLabel.numberOfLines = 1
+        hostageLabel.text = " 💙 Remaining: 0/0 "
+        hostageLabel.layer.cornerRadius = 6
+        hostageLabel.layer.masksToBounds = true
+        hostageLabel.adjustsFontSizeToFitWidth = true
+        hostageLabel.minimumScaleFactor = 0.7
+        
+        view.addSubview(hostageLabel)
+        
+        // Position at top-center, to the left of level label (matches HUD style)
+        NSLayoutConstraint.activate([
+            hostageLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            hostageLabel.trailingAnchor.constraint(equalTo: levelLabel.leadingAnchor, constant: -10),
+            hostageLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            hostageLabel.heightAnchor.constraint(equalToConstant: 32)
+        ])
+        
+    }
+    
+    func updateHostageCount(_ saved: Int, _ total: Int) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            let remaining = total - saved
+            
+            // Update label to show remaining hostages
+            self.hostageLabel.text = String(format: " 💙 Remaining: %d/%d ", remaining, total)
+            
+            // Change color based on status
+            if saved == total && total > 0 {
+                self.hostageLabel.textColor = .green  // All saved!
+                self.hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+            } else if saved > 0 {
+                self.hostageLabel.textColor = .cyan  // Some saved
+                self.hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+            } else {
+                self.hostageLabel.textColor = .yellow  // None saved yet
+                self.hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+            }
+        }
+    }
+    
+    // MARK: - Score HUD
+    
+    func setupScoreHUD() {
+        
+        // Create score label
+        scoreLabel = UILabel()
+        scoreLabel.translatesAutoresizingMaskIntoConstraints = false
+        scoreLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        scoreLabel.textColor = .yellow
+        scoreLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        scoreLabel.textAlignment = .center
+        scoreLabel.numberOfLines = 1
+        scoreLabel.text = " 🏆 Score: 0 "
+        scoreLabel.layer.cornerRadius = 6
+        scoreLabel.layer.masksToBounds = true
+        scoreLabel.adjustsFontSizeToFitWidth = true
+        scoreLabel.minimumScaleFactor = 0.7
+        
+        view.addSubview(scoreLabel)
+        
+        // Position at top-center of screen (horizontal, no rotation)
+        NSLayoutConstraint.activate([
+            scoreLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            scoreLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            scoreLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 140),
+            scoreLabel.heightAnchor.constraint(equalToConstant: 32)
+        ])
+        
+    }
+    
+    func updateScore(_ score: Int) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Update label with current score
+            self.scoreLabel.text = String(format: " 🏆 Score: %d ", score)
+            self.scoreLabel.textColor = .yellow
+            self.scoreLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        }
+    }
+    
+    // MARK: - Level HUD
+    
+    func setupLevelHUD() {
+        
+        // Create level label (to the left of score label)
+        levelLabel = UILabel()
+        levelLabel.translatesAutoresizingMaskIntoConstraints = false
+        levelLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        levelLabel.textColor = .cyan
+        levelLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        levelLabel.textAlignment = .center
+        levelLabel.numberOfLines = 1
+        levelLabel.text = " 🎮 Level: 1 "
+        levelLabel.layer.cornerRadius = 6
+        levelLabel.layer.masksToBounds = true
+        levelLabel.adjustsFontSizeToFitWidth = true
+        levelLabel.minimumScaleFactor = 0.7
+        
+        view.addSubview(levelLabel)
+        
+        // Position at top-center, to the left of score label
+        NSLayoutConstraint.activate([
+            levelLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            levelLabel.trailingAnchor.constraint(equalTo: scoreLabel.leadingAnchor, constant: -10),
+            levelLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            levelLabel.heightAnchor.constraint(equalToConstant: 32)
+        ])
+        
+    }
+    
+    func updateLevel(_ level: Int) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Update label with current level
+            self.levelLabel.text = String(format: " 🎮 Level: %d ", level)
+            self.levelLabel.textColor = .cyan
+            self.levelLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        }
+    }
+    
+    // MARK: - Mini-Map HUD
+    
+    func setupMiniMap() {
+        // Create mini-map container view (bottom-right corner)
+        miniMapView = UIView()
+        miniMapView.translatesAutoresizingMaskIntoConstraints = false
+        miniMapView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        miniMapView.layer.cornerRadius = 8
+        miniMapView.layer.masksToBounds = true
+        miniMapView.layer.borderWidth = 2
+        miniMapView.layer.borderColor = UIColor.cyan.cgColor
+        miniMapView.isUserInteractionEnabled = false  // Don't block controller input!
+        
+        view.addSubview(miniMapView)
+        
+        // Position at bottom-right corner
+        let mapSize: CGFloat = 120
+        NSLayoutConstraint.activate([
+            miniMapView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            miniMapView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            miniMapView.widthAnchor.constraint(equalToConstant: mapSize),
+            miniMapView.heightAnchor.constraint(equalToConstant: mapSize)
+        ])
+        
+        // Add title label
+        let titleLabel = UILabel()
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text = "MAP"
+        titleLabel.font = UIFont.boldSystemFont(ofSize: 10)
+        titleLabel.textColor = .cyan
+        titleLabel.textAlignment = .center
+        miniMapView.addSubview(titleLabel)
+        
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: miniMapView.topAnchor, constant: 2),
+            titleLabel.centerXAnchor.constraint(equalTo: miniMapView.centerXAnchor)
+        ])
+    }
+    
+    func updateMiniMap() {
+        // Remove old dots
+        miniMapDots.forEach { $0.removeFromSuperview() }
+        miniMapDots.removeAll()
+        
+        guard let gameScene = gameScene else { return }
+        
+        let mapWidth = Float(gameScene.cityMap.width)
+        let mapHeight = Float(gameScene.cityMap.height)
+        let miniMapSize: CGFloat = 120
+        let mapArea: CGFloat = miniMapSize - 20  // Leave space for title and borders
+        
+        // Helper function to convert world position to mini-map coordinates
+        func worldToMiniMap(x: Float, z: Float) -> (CGFloat, CGFloat) {
+            let normalizedX = CGFloat(x / mapWidth)
+            let normalizedZ = CGFloat(z / mapHeight)
+            let dotX = normalizedX * mapArea + 10
+            let dotY = normalizedZ * mapArea + 15  // +15 to account for title
+            return (dotX, dotY)
+        }
+        
+        // Add blue dots for each unsaved hostage
+        for hostage in gameScene.hostages where hostage.state != .saved {
+            let pos = hostage.node.position
+            let (dotX, dotY) = worldToMiniMap(x: pos.x, z: pos.z)
+            
+            let dot = UIView()
+            dot.frame = CGRect(x: dotX - 4, y: dotY - 4, width: 8, height: 8)
+            dot.backgroundColor = UIColor(red: 0.3, green: 0.7, blue: 1.0, alpha: 1.0)  // Bright blue
+            dot.layer.cornerRadius = 4
+            dot.layer.borderWidth = 1
+            dot.layer.borderColor = UIColor.white.cgColor
+            
+            miniMapView.addSubview(dot)
+            miniMapDots.append(dot)
+        }
+        
+        // Add or update player position dot (white)
+        if let ballNode = gameScene.ballNode {
+            let playerPos = ballNode.presentation.position
+            let (playerX, playerY) = worldToMiniMap(x: playerPos.x, z: playerPos.z)
+            
+            // Create player dot if it doesn't exist
+            if miniMapPlayerDot == nil {
+                let playerDot = UIView()
+                playerDot.frame = CGRect(x: 0, y: 0, width: 10, height: 10)
+                playerDot.backgroundColor = UIColor.white
+                playerDot.layer.cornerRadius = 5
+                playerDot.layer.borderWidth = 2
+                playerDot.layer.borderColor = UIColor.black.cgColor
+                miniMapView.addSubview(playerDot)
+                miniMapPlayerDot = playerDot
+            }
+            
+            // Update player dot position
+            miniMapPlayerDot?.frame = CGRect(x: playerX - 5, y: playerY - 5, width: 10, height: 10)
+        }
+    }
+    
     // MARK: - Debug HUD Visibility Control
     
     func updateDebugHUDVisibility(_ shouldShow: Bool) {
@@ -384,10 +644,18 @@ class GameViewController3D: UIViewController {
             }
             
             // Optional: Right stick for camera rotation (if you want to add that later)
-            // B button could be used for something else
+            // B button rotates camera view by 45 degrees
             gamepad.buttonB.valueChangedHandler = { [weak self] (button, value, pressed) in
                 if pressed {
-                    // Could add special action here
+                    self?.gameScene.rotateCameraView()
+                }
+            }
+            
+            // X button exits the game
+            gamepad.buttonX.valueChangedHandler = { [weak self] (button, value, pressed) in
+                if pressed {
+                    print("👋 X button pressed - Exiting game")
+                    exit(0)
                 }
             }
         }
@@ -407,6 +675,12 @@ class GameViewController3D: UIViewController {
         
         // Update enemy AI
         gameScene.updateEnemyAI()
+        
+        // Update hostage rescue system
+        gameScene.updateHostages()
+        
+        // Update mini-map (every frame to show real-time positions)
+        updateMiniMap()
         
         // Update ball movement from controller input (if connected)
         if controller != nil {
@@ -580,5 +854,59 @@ class GameViewController3D: UIViewController {
         // Reset enemy positions to corners
         gameScene.createEnemyBalls()
         
+    }
+    
+    func showLevelCompleteMessage() {
+        // Create overlay container
+        let overlayView = UIView(frame: view.bounds)
+        overlayView.backgroundColor = UIColor(white: 0, alpha: 0.7)
+        overlayView.alpha = 0
+        view.addSubview(overlayView)
+        
+        // Create level complete label
+        let messageLabel = UILabel()
+        messageLabel.text = "🎉 LEVEL \(gameScene.currentLevel - 1) COMPLETE! 🎉"
+        messageLabel.font = UIFont.boldSystemFont(ofSize: 36)
+        messageLabel.textColor = .green
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.addSubview(messageLabel)
+        
+        // Create next level label
+        let nextLevelLabel = UILabel()
+        nextLevelLabel.text = "Level \(gameScene.currentLevel) Starting..."
+        nextLevelLabel.font = UIFont.systemFont(ofSize: 24)
+        nextLevelLabel.textColor = .cyan
+        nextLevelLabel.textAlignment = .center
+        nextLevelLabel.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.addSubview(nextLevelLabel)
+        
+        // Layout constraints
+        NSLayoutConstraint.activate([
+            messageLabel.centerXAnchor.constraint(equalTo: overlayView.centerXAnchor),
+            messageLabel.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor, constant: -30),
+            messageLabel.leadingAnchor.constraint(greaterThanOrEqualTo: overlayView.leadingAnchor, constant: 20),
+            messageLabel.trailingAnchor.constraint(lessThanOrEqualTo: overlayView.trailingAnchor, constant: -20),
+            
+            nextLevelLabel.centerXAnchor.constraint(equalTo: overlayView.centerXAnchor),
+            nextLevelLabel.topAnchor.constraint(equalTo: messageLabel.bottomAnchor, constant: 20),
+            nextLevelLabel.leadingAnchor.constraint(greaterThanOrEqualTo: overlayView.leadingAnchor, constant: 20),
+            nextLevelLabel.trailingAnchor.constraint(lessThanOrEqualTo: overlayView.trailingAnchor, constant: -20)
+        ])
+        
+        // Animate in
+        UIView.animate(withDuration: 0.3) {
+            overlayView.alpha = 1.0
+        }
+        
+        // Auto-dismiss after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            UIView.animate(withDuration: 0.3, animations: {
+                overlayView.alpha = 0
+            }) { _ in
+                overlayView.removeFromSuperview()
+            }
+        }
     }
 }
