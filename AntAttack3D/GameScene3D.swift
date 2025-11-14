@@ -19,6 +19,11 @@ class GameScene3D: SCNScene {
     var enemyBalls: [EnemyBall] = []
     var lastEnemyUpdateTime: TimeInterval = 0
     
+    // OPTIMIZATION: Shared materials and geometry for all blocks (memory and performance improvement)
+    private var sharedBlockGeometry: SCNBox!
+    private var sharedBlockMaterials: [SCNMaterial] = []
+    private var sharedPhysicsShape: SCNPhysicsShape!
+    
     // Camera follow configuration (updated by config server)
     var droneAngle: Float = 45.0        // Down angle in degrees (10-90)
     var droneDistance: Float = 30.0     // Distance from ball
@@ -290,6 +295,9 @@ class GameScene3D: SCNScene {
         blockNodes.forEach { $0.removeFromParentNode() }
         blockNodes.removeAll()
         
+        // OPTIMIZATION: Initialize shared geometry and materials once for all blocks
+        initializeSharedBlockResources()
+        
         // Create flat sand-colored ground
         createGround()
         
@@ -308,6 +316,56 @@ class GameScene3D: SCNScene {
         for ramp in cityMap.ramps {
             createRamp(ramp: ramp)
         }
+    }
+    
+    // OPTIMIZATION: Initialize shared resources once instead of creating per-block
+    // This dramatically reduces memory usage and improves rendering performance
+    func initializeSharedBlockResources() {
+        // Create shared geometry (all blocks use the same 1x1x1 box)
+        sharedBlockGeometry = SCNBox(width: 1.0, height: 1.0, length: 1.0, chamferRadius: 0.0)
+        
+        // Create shared materials (reused across all blocks)
+        sharedBlockMaterials = createSharedBlockMaterials()
+        sharedBlockGeometry.materials = sharedBlockMaterials
+        
+        // Create shared physics shape (reused across all blocks)
+        sharedPhysicsShape = SCNPhysicsShape(
+            geometry: SCNBox(width: 1.0, height: 1.0, length: 1.0, chamferRadius: 0.0),
+            options: nil
+        )
+    }
+    
+    // Create materials once to be shared across all blocks
+    func createSharedBlockMaterials() -> [SCNMaterial] {
+        var materials: [SCNMaterial] = []
+        
+        // Top face
+        let topMaterial = SCNMaterial()
+        topMaterial.diffuse.contents = UIColor(red: 0.75, green: 0.75, blue: 0.75, alpha: 1.0)
+        topMaterial.lightingModel = .lambert
+        
+        // Side faces (darker shades)
+        let sideMaterial1 = SCNMaterial()
+        sideMaterial1.diffuse.contents = UIColor(red: 0.65, green: 0.65, blue: 0.65, alpha: 1.0)
+        sideMaterial1.lightingModel = .lambert
+        
+        let sideMaterial2 = SCNMaterial()
+        sideMaterial2.diffuse.contents = UIColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1.0)
+        sideMaterial2.lightingModel = .lambert
+        
+        let bottomMaterial = SCNMaterial()
+        bottomMaterial.diffuse.contents = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
+        bottomMaterial.lightingModel = .lambert
+        
+        // Order: front, right, back, left, top, bottom
+        materials.append(sideMaterial1)  // front
+        materials.append(sideMaterial2)  // right
+        materials.append(sideMaterial1)  // back
+        materials.append(sideMaterial2)  // left
+        materials.append(topMaterial)    // top
+        materials.append(bottomMaterial) // bottom
+        
+        return materials
     }
     
     func createGround() {
@@ -346,15 +404,9 @@ class GameScene3D: SCNScene {
     }
     
     func createBlock(x: Int, y: Int, z: Int) {
-        // Create a box geometry (1x1x1 unit cube)
-        let box = SCNBox(width: 1.0, height: 1.0, length: 1.0, chamferRadius: 0.0)
-        
-        // Create materials for each face
-        let materials = createBlockMaterials(z: z)
-        box.materials = materials
-        
-        // Create node and position it
-        let blockNode = SCNNode(geometry: box)
+        // OPTIMIZATION: Use geometry instancing - share geometry and materials across all blocks
+        // This dramatically reduces memory usage and draw calls
+        let blockNode = SCNNode(geometry: sharedBlockGeometry)
         
         // Shadow casting disabled
         blockNode.castsShadow = false
@@ -367,10 +419,8 @@ class GameScene3D: SCNScene {
             z: Float(y)
         )
         
-        // Add static physics body to block
-        // OPTIMIZATION: Use box primitive instead of geometry for faster physics (3x performance gain)
-        let boxShape = SCNPhysicsShape(geometry: SCNBox(width: 1.0, height: 1.0, length: 1.0, chamferRadius: 0.0), options: nil)
-        blockNode.physicsBody = SCNPhysicsBody(type: .static, shape: boxShape)
+        // Add static physics body using shared physics shape
+        blockNode.physicsBody = SCNPhysicsBody(type: .static, shape: sharedPhysicsShape)
         blockNode.physicsBody?.restitution = 0.1
         blockNode.physicsBody?.friction = 0.8
         
@@ -594,42 +644,6 @@ class GameScene3D: SCNScene {
         return image
     }
     
-    func createBlockMaterials(z: Int) -> [SCNMaterial] {
-        // Create 6 materials (one for each face of the cube)
-        // Order: front, right, back, left, top, bottom
-        
-        var materials: [SCNMaterial] = []
-        
-        // All blocks use the same shades of grey regardless of height
-        
-        // Top face
-        let topMaterial = SCNMaterial()
-        topMaterial.diffuse.contents = UIColor(red: 0.75, green: 0.75, blue: 0.75, alpha: 1.0) // Light gray
-        topMaterial.lightingModel = .lambert
-        
-        // Side faces (darker shades)
-        let sideMaterial1 = SCNMaterial()
-        sideMaterial1.diffuse.contents = UIColor(red: 0.65, green: 0.65, blue: 0.65, alpha: 1.0)
-        sideMaterial1.lightingModel = .lambert
-        
-        let sideMaterial2 = SCNMaterial()
-        sideMaterial2.diffuse.contents = UIColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1.0)
-        sideMaterial2.lightingModel = .lambert
-        
-        let bottomMaterial = SCNMaterial()
-        bottomMaterial.diffuse.contents = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
-        bottomMaterial.lightingModel = .lambert
-        
-        // Assign materials: front, right, back, left, top, bottom
-        materials.append(sideMaterial1)  // front
-        materials.append(sideMaterial2)  // right
-        materials.append(sideMaterial1)  // back
-        materials.append(sideMaterial2)  // left
-        materials.append(topMaterial)    // top
-        materials.append(bottomMaterial) // bottom
-        
-        return materials
-    }
     
     func addAxisLabels() {
         // Create axis lines and labels at the origin
@@ -735,7 +749,7 @@ class GameScene3D: SCNScene {
         physicsBody.restitution = 0.3  // Some bounciness
         physicsBody.friction = 0.8     // Higher friction for better traction on slopes (was 0.5)
         physicsBody.rollingFriction = 0.3  // Higher rolling friction for slopes (was 0.2)
-        physicsBody.damping = 0.1      // Small air resistance
+        physicsBody.damping = 0.02     // Minimal air resistance for faster falling
         physicsBody.angularDamping = 0.1
         
         ballNode.physicsBody = physicsBody
@@ -744,7 +758,7 @@ class GameScene3D: SCNScene {
         
         // Enable physics on the world
         physicsWorld.speed = 1.0
-        physicsWorld.gravity = SCNVector3(0, -98.0, 0)  // Strong gravity (10x Earth gravity) - ball falls immediately
+        physicsWorld.gravity = SCNVector3(0, -150.0, 0)  // Very strong gravity for fast falling/jumping
     }
     
     // Create enemy balls in corners
