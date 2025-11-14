@@ -223,6 +223,30 @@
         
         <div class="control-group">
             <label>
+                Fog Start Distance: <span class="value-display" id="fogStartValue">40.0</span>
+                <span class="description">Distance where fog begins to appear</span>
+            </label>
+            <input type="range" id="fogStartDistance" min="10" max="100" step="1" value="40">
+            <div class="range-labels">
+                <span>10 (close)</span>
+                <span>100 (far)</span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label>
+                Fog End Distance: <span class="value-display" id="fogEndValue">80.0</span>
+                <span class="description">Distance where fog completely obscures objects</span>
+            </label>
+            <input type="range" id="fogEndDistance" min="20" max="150" step="1" value="80">
+            <div class="range-labels">
+                <span>20 (close)</span>
+                <span>150 (far)</span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label>
                 Debug Options
                 <span class="description">Developer tools and diagnostics</span>
             </label>
@@ -230,6 +254,11 @@
             <div class="checkbox-group">
                 <input type="checkbox" id="showDebugHUD">
                 <label for="showDebugHUD" class="checkbox-label">Show Debug HUD (connection, visibility, distance)</label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="showsStatistics">
+                <label for="showsStatistics" class="checkbox-label">Show FPS Statistics</label>
             </div>
         </div>
         
@@ -246,10 +275,15 @@
         const shadowsCheckbox = document.getElementById('shadowsEnabled');
         const orbitSearchDelaySlider = document.getElementById('orbitSearchDelay');
         const showDebugHUDCheckbox = document.getElementById('showDebugHUD');
+        const showsStatisticsCheckbox = document.getElementById('showsStatistics');
+        const fogStartDistanceSlider = document.getElementById('fogStartDistance');
+        const fogEndDistanceSlider = document.getElementById('fogEndDistance');
         const angleValue = document.getElementById('angleValue');
         const distanceValue = document.getElementById('distanceValue');
         const ambientValue = document.getElementById('ambientValue');
         const orbitDelayValue = document.getElementById('orbitDelayValue');
+        const fogStartValue = document.getElementById('fogStartValue');
+        const fogEndValue = document.getElementById('fogEndValue');
         
         // Update display and server when sliders change
         droneAngleSlider.addEventListener('input', (e) => {
@@ -284,6 +318,22 @@
             updateConfig();
         });
         
+        showsStatisticsCheckbox.addEventListener('change', () => {
+            updateConfig();
+        });
+        
+        fogStartDistanceSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            fogStartValue.textContent = value.toFixed(1);
+            updateConfig();
+        });
+        
+        fogEndDistanceSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            fogEndValue.textContent = value.toFixed(1);
+            updateConfig();
+        });
+        
         // Debounced update to avoid too many requests
         let updateTimeout;
         function updateConfig() {
@@ -300,7 +350,10 @@
                         ambientLight: parseFloat(ambientLightSlider.value),
                         shadowsEnabled: shadowsCheckbox.checked,
                         orbitSearchDelay: parseFloat(orbitSearchDelaySlider.value),
-                        showDebugHUD: showDebugHUDCheckbox.checked
+                        showDebugHUD: showDebugHUDCheckbox.checked,
+                        showsStatistics: showsStatisticsCheckbox.checked,
+                        fogStartDistance: parseFloat(fogStartDistanceSlider.value),
+                        fogEndDistance: parseFloat(fogEndDistanceSlider.value)
                     })
                 })
                 .then(response => response.json())
@@ -323,10 +376,15 @@
                 shadowsCheckbox.checked = data.shadowsEnabled || false;
                 orbitSearchDelaySlider.value = data.orbitSearchDelay || 10.0;
                 showDebugHUDCheckbox.checked = data.showDebugHUD || false;
+                showsStatisticsCheckbox.checked = data.showsStatistics || false;
+                fogStartDistanceSlider.value = data.fogStartDistance || 40.0;
+                fogEndDistanceSlider.value = data.fogEndDistance || 80.0;
                 angleValue.textContent = (data.droneAngle || 45).toFixed(0);
                 distanceValue.textContent = data.droneDistance.toFixed(1);
                 ambientValue.textContent = (data.ambientLight || 0.5).toFixed(2);
                 orbitDelayValue.textContent = (data.orbitSearchDelay || 10.0).toFixed(1);
+                fogStartValue.textContent = (data.fogStartDistance || 40.0).toFixed(1);
+                fogEndValue.textContent = (data.fogEndDistance || 80.0).toFixed(1);
             })
             .catch(error => {
                 console.error('Error loading config:', error);

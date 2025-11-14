@@ -112,11 +112,12 @@ class GameScene3D: SCNScene {
     
     // Called when config is received (either from callback or forwarded from view controller)
     func onConfigReceived(_ config: GameConfig) {
-        logger.debug("Config update: angle=\(config.droneAngle)°, distance=\(config.droneDistance), shadows=\(config.shadowsEnabled)")
+        logger.debug("Config update: angle=\(config.droneAngle)°, distance=\(config.droneDistance), shadows=\(config.shadowsEnabled), fog=\(config.fogStartDistance)-\(config.fogEndDistance)")
         
         // Only force immediate camera update if angle or distance changed
         let angleChanged = self.droneAngle != config.droneAngle
         let distanceChanged = self.droneDistance != config.droneDistance
+        let fogChanged = abs(self.fogStartDistance - CGFloat(config.fogStartDistance)) > 0.01 || abs(self.fogEndDistance - CGFloat(config.fogEndDistance)) > 0.01
         
         if distanceChanged {
         }
@@ -129,6 +130,12 @@ class GameScene3D: SCNScene {
         
         if angleChanged || distanceChanged {
             self.forceImmediateCameraUpdate = true
+        }
+        
+        // Update fog distances if changed
+        if fogChanged {
+            self.fogStartDistance = CGFloat(config.fogStartDistance)
+            self.fogEndDistance = CGFloat(config.fogEndDistance)
         }
         
         self.updateAmbientLight(config.ambientLight)
@@ -787,9 +794,9 @@ class GameScene3D: SCNScene {
         let matSize: CGFloat = 6.0
         let mat = SCNPlane(width: matSize, height: matSize)
         
-        // Light blue semi-transparent material for the safe zone
+        // Bright blue semi-transparent material for the safe zone (visible on mini-map)
         let material = SCNMaterial()
-        material.diffuse.contents = UIColor(red: 0.3, green: 0.7, blue: 1.0, alpha: 0.4)  // Light blue
+        material.diffuse.contents = UIColor(red: 0.0, green: 0.3, blue: 1.0, alpha: 0.5)  // Bright blue
         material.lightingModel = .lambert
         material.isDoubleSided = true  // Visible from both sides
         mat.materials = [material]
@@ -829,6 +836,11 @@ class GameScene3D: SCNScene {
         
         for x in 0..<cityMap.width {
             for y in 0..<cityMap.height {
+                // Skip boundary walls - no hostages on edges
+                if x == 0 || x == cityMap.width - 1 || y == 0 || y == cityMap.height - 1 {
+                    continue
+                }
+                
                 // Check if there's a block at z=1
                 if cityMap.hasBlock(x: x, y: y, z: 1) {
                     blocksAtZ1 += 1
@@ -877,6 +889,11 @@ class GameScene3D: SCNScene {
             print("⚠️ No valid z=1 positions, trying z=0 (ground level)...")
             for x in 0..<cityMap.width {
                 for y in 0..<cityMap.height {
+                    // Skip boundary walls - no hostages on edges
+                    if x == 0 || x == cityMap.width - 1 || y == 0 || y == cityMap.height - 1 {
+                        continue
+                    }
+                    
                     // Check if there's a block at z=0 (ground)
                     if cityMap.hasBlock(x: x, y: y, z: 0) {
                         // Make sure there's space at z=1 and z=2 (hostage needs room to stand)

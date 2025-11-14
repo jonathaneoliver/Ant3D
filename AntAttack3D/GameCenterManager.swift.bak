@@ -4,17 +4,8 @@ import UIKit
 class GameCenterManager: NSObject {
     static let shared = GameCenterManager()
     
-    var isAuthenticated = false {
-        didSet {
-            // Post notification when authentication state changes
-            NotificationCenter.default.post(
-                name: NSNotification.Name("GameCenterAuthenticationChanged"),
-                object: nil
-            )
-        }
-    }
+    var isAuthenticated = false
     var localPlayer: GKLocalPlayer?
-    var authenticationError: Error?
     
     // Leaderboard ID - update this in App Store Connect
     private let leaderboardID = "antattack3d_highscores"
@@ -29,10 +20,6 @@ class GameCenterManager: NSObject {
         
         print("🎮 [GameCenter] Starting authentication...")
         
-        #if targetEnvironment(simulator)
-        print("⚠️ [GameCenter] Running in Simulator - Game Center may not work properly")
-        #endif
-        
         localPlayer?.authenticateHandler = { [weak self] viewController, error in
             if let viewController = viewController {
                 print("🎮 [GameCenter] Presenting authentication view controller")
@@ -41,50 +28,14 @@ class GameCenterManager: NSObject {
                     window.rootViewController?.present(viewController, animated: true)
                 }
             } else if let error = error {
-                let nsError = error as NSError
                 print("❌ [GameCenter] Authentication error: \(error.localizedDescription)")
-                print("❌ [GameCenter] Error domain: \(nsError.domain), code: \(nsError.code)")
-                
-                // Handle specific error cases
-                switch (nsError.domain, nsError.code) {
-                case ("GKErrorDomain", 3):
-                    // Server communication error - common in simulator
-                    #if targetEnvironment(simulator)
-                    print("⚠️ [GameCenter] Simulator limitation - Game Center requires a real device")
-                    #else
-                    print("⚠️ [GameCenter] Server communication error - check network connection")
-                    #endif
-                    
-                case ("GKErrorDomain", 2):
-                    // User cancelled authentication
-                    print("⚠️ [GameCenter] User cancelled authentication")
-                    
-                case ("GKErrorDomain", 4):
-                    // Authentication failed
-                    print("⚠️ [GameCenter] Authentication failed - user may not be signed in")
-                    
-                default:
-                    print("⚠️ [GameCenter] Unknown error: \(nsError)")
-                }
-                
-                self?.authenticationError = error
                 self?.isAuthenticated = false
             } else {
                 self?.isAuthenticated = self?.localPlayer?.isAuthenticated ?? false
-                self?.authenticationError = nil
-                
                 if let player = self?.localPlayer {
-                    if player.isAuthenticated {
-                        print("✅ [GameCenter] Authenticated: \(player.isAuthenticated)")
-                        print("✅ [GameCenter] Player: \(player.displayName)")
-                        print("✅ [GameCenter] PlayerID: \(player.gamePlayerID)")
-                    } else {
-                        print("⚠️ [GameCenter] Player not authenticated")
-                        #if targetEnvironment(simulator)
-                        print("⚠️ [GameCenter] Note: Game Center is not supported in the Simulator")
-                        print("⚠️ [GameCenter] Please test on a real device with an Apple ID signed into Game Center")
-                        #endif
-                    }
+                    print("✅ [GameCenter] Authenticated: \(player.isAuthenticated)")
+                    print("✅ [GameCenter] Player: \(player.displayName)")
+                    print("✅ [GameCenter] PlayerID: \(player.gamePlayerID)")
                 } else {
                     print("❌ [GameCenter] No local player found")
                 }
@@ -95,9 +46,6 @@ class GameCenterManager: NSObject {
     func submitScore(_ score: Int) {
         guard isAuthenticated else {
             print("❌ [GameCenter] Player not authenticated - cannot submit score")
-            #if targetEnvironment(simulator)
-            print("⚠️ [GameCenter] Game Center requires a real device - score saved locally only")
-            #endif
             return
         }
         
@@ -171,29 +119,6 @@ class GameCenterManager: NSObject {
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first {
             window.rootViewController?.present(leaderboardViewController, animated: true)
-        }
-    }
-    
-    func getStatusMessage() -> String {
-        if isAuthenticated {
-            return "Connected"
-        } else if let error = authenticationError as? NSError {
-            #if targetEnvironment(simulator)
-            return "Simulator Only"
-            #else
-            switch (error.domain, error.code) {
-            case ("GKErrorDomain", 3):
-                return "Network Error"
-            case ("GKErrorDomain", 2):
-                return "Not Signed In"
-            case ("GKErrorDomain", 4):
-                return "Auth Failed"
-            default:
-                return "Offline"
-            }
-            #endif
-        } else {
-            return "Connecting..."
         }
     }
 }

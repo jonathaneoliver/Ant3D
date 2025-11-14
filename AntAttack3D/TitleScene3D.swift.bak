@@ -25,7 +25,7 @@ class TitleScene3D: UIViewController {
         // Title label
         titleLabel = UILabel()
         titleLabel.text = "ANT ATTACK 3D"
-        titleLabel.font = UIFont.boldSystemFont(ofSize: 28)
+        titleLabel.font = UIFont.boldSystemFont(ofSize: 48)
         titleLabel.textColor = UIColor(red: 1.0, green: 0.9, blue: 0.0, alpha: 1.0) // Gold
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -40,7 +40,7 @@ class TitleScene3D: UIViewController {
         // Subtitle
         let subtitleLabel = UILabel()
         subtitleLabel.text = "Rescue the Hostages!"
-        subtitleLabel.font = UIFont.systemFont(ofSize: 14)
+        subtitleLabel.font = UIFont.systemFont(ofSize: 20)
         subtitleLabel.textColor = UIColor(red: 0.0, green: 0.8, blue: 1.0, alpha: 1.0) // Cyan
         subtitleLabel.textAlignment = .center
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -49,7 +49,7 @@ class TitleScene3D: UIViewController {
         // Game Center status label (top right)
         gameCenterStatusLabel = UILabel()
         updateGameCenterStatus()
-        gameCenterStatusLabel.font = UIFont.systemFont(ofSize: 12)
+        gameCenterStatusLabel.font = UIFont.systemFont(ofSize: 14)
         gameCenterStatusLabel.textAlignment = .right
         gameCenterStatusLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(gameCenterStatusLabel)
@@ -83,50 +83,50 @@ class TitleScene3D: UIViewController {
             text: "🎮 GAME CENTER",
             color: UIColor(red: 0.8, green: 0.3, blue: 1.0, alpha: 1.0),
             action: #selector(gameCenterTapped),
-            fontSize: 18
+            fontSize: 22
         )
         view.addSubview(gameCenterButton)
         
         // Layout constraints
         let safeArea = view.safeAreaLayoutGuide
-        let spacing: CGFloat = 12
+        let spacing: CGFloat = 20
         
         NSLayoutConstraint.activate([
             // Game Center status in top right
-            gameCenterStatusLabel.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 8),
+            gameCenterStatusLabel.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 10),
             gameCenterStatusLabel.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -15),
             gameCenterStatusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: safeArea.leadingAnchor, constant: 15),
             
-            // Title at top (reduced margin for landscape)
-            titleLabel.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 15),
+            // Title at top
+            titleLabel.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 80),
             titleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
             
             // Subtitle below title
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 5),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10),
             subtitleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             
-            // Buttons centered vertically with compact sizing
+            // Buttons centered vertically
             startButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            startButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -45),
-            startButton.widthAnchor.constraint(equalToConstant: 220),
-            startButton.heightAnchor.constraint(equalToConstant: 45),
+            startButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -60),
+            startButton.widthAnchor.constraint(equalToConstant: 280),
+            startButton.heightAnchor.constraint(equalToConstant: 60),
             
             highScoreButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             highScoreButton.topAnchor.constraint(equalTo: startButton.bottomAnchor, constant: spacing),
-            highScoreButton.widthAnchor.constraint(equalToConstant: 220),
-            highScoreButton.heightAnchor.constraint(equalToConstant: 45),
+            highScoreButton.widthAnchor.constraint(equalToConstant: 280),
+            highScoreButton.heightAnchor.constraint(equalToConstant: 60),
             
             aboutButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             aboutButton.topAnchor.constraint(equalTo: highScoreButton.bottomAnchor, constant: spacing),
-            aboutButton.widthAnchor.constraint(equalToConstant: 220),
-            aboutButton.heightAnchor.constraint(equalToConstant: 45),
+            aboutButton.widthAnchor.constraint(equalToConstant: 280),
+            aboutButton.heightAnchor.constraint(equalToConstant: 60),
             
             gameCenterButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             gameCenterButton.topAnchor.constraint(equalTo: aboutButton.bottomAnchor, constant: spacing),
-            gameCenterButton.widthAnchor.constraint(equalToConstant: 220),
-            gameCenterButton.heightAnchor.constraint(equalToConstant: 45)
+            gameCenterButton.widthAnchor.constraint(equalToConstant: 280),
+            gameCenterButton.heightAnchor.constraint(equalToConstant: 60)
         ])
         
         // Add pulsing animation to title
@@ -180,19 +180,12 @@ class TitleScene3D: UIViewController {
         DispatchQueue.main.async { [weak self] in
             guard let self = self, let label = self.gameCenterStatusLabel else { return }
             
-            let statusMsg = GameCenterManager.shared.getStatusMessage()
-            
             if GameCenterManager.shared.isAuthenticated {
-                label.text = "🎮 ✓ \(statusMsg)"
+                label.text = "🎮 ✓ Connected"
                 label.textColor = .green
             } else {
-                #if targetEnvironment(simulator)
-                label.text = "🎮 \(statusMsg)"
-                label.textColor = .gray
-                #else
-                label.text = "🎮 \(statusMsg)"
+                label.text = "🎮 Connecting..."
                 label.textColor = .orange
-                #endif
             }
         }
     }
@@ -221,7 +214,7 @@ class TitleScene3D: UIViewController {
         view.layer.insertSublayer(gridLayer, at: 0)
     }
     
-    private func createStyledButton(text: String, color: UIColor, action: Selector, fontSize: CGFloat = 22) -> UIButton {
+    private func createStyledButton(text: String, color: UIColor, action: Selector, fontSize: CGFloat = 28) -> UIButton {
         let button = UIButton(type: .system)
         button.setTitle(text, for: .normal)
         button.titleLabel?.font = UIFont.boldSystemFont(ofSize: fontSize)
@@ -283,15 +276,9 @@ class TitleScene3D: UIViewController {
             GameCenterManager.shared.showGameCenterLeaderboard()
         } else {
             // Show alert if not authenticated
-            #if targetEnvironment(simulator)
-            let message = "Game Center is not available in the Simulator. Please test on a real iOS device with an Apple ID signed into Game Center."
-            #else
-            let message = "Game Center is not available. Please sign in to Game Center in Settings."
-            #endif
-            
             let alert = UIAlertController(
                 title: "Game Center",
-                message: message,
+                message: "Game Center is not available. Please sign in to Game Center in Settings.",
                 preferredStyle: .alert
             )
             alert.addAction(UIAlertAction(title: "OK", style: .default))

@@ -22,139 +22,160 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
         // Dark background
         view.backgroundColor = .black
         
-        // Load scores first to determine if user qualifies
-        loadScores()
-        
-        let qualifies: Bool = {
-            if finalScore < 0 { return false }
-            if scores.count < maxScores { return true }
-            return finalScore > scores.last?.1 ?? Int.min
-        }()
-        
-        let isEntry = qualifies
+        let isEntry = (finalScore >= 0)
         let isViewOnly = !isEntry
         let safeArea = view.safeAreaLayoutGuide
         
-        // Prompt/Title label
+        // Prompt/Title label - smaller for landscape
         promptLabel = UILabel()
         if isViewOnly {
             promptLabel.text = "HIGH SCORES"
         } else {
             promptLabel.text = "NEW HIGH SCORE!\nEnter your initials:"
         }
-        promptLabel.font = UIFont.boldSystemFont(ofSize: isViewOnly ? 48 : 32)
+        promptLabel.font = UIFont.boldSystemFont(ofSize: isViewOnly ? 28 : 24)
         promptLabel.textColor = isViewOnly ? .cyan : .yellow
         promptLabel.textAlignment = .center
         promptLabel.numberOfLines = 0
         promptLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(promptLabel)
         
-        // Initials label (for visual feedback)
+        // Initials label (for visual feedback) - smaller
         initialsLabel = UILabel()
         initialsLabel.text = isViewOnly ? "" : "___"
-        initialsLabel.font = UIFont.boldSystemFont(ofSize: 48)
+        initialsLabel.font = UIFont.boldSystemFont(ofSize: 32)
         initialsLabel.textColor = .yellow
         initialsLabel.textAlignment = .center
         initialsLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(initialsLabel)
         
-        // GameCenter status indicator
+        // GameCenter status indicator - smaller
         statusLabel = UILabel()
         if GameCenterManager.shared.isAuthenticated {
-            statusLabel.text = "🎮 GameCenter Connected"
+            statusLabel.text = "🎮 Connected"
             statusLabel.textColor = .green
         } else {
-            statusLabel.text = "🎮 GameCenter Offline"
+            statusLabel.text = "🎮 Offline"
             statusLabel.textColor = .orange
         }
-        statusLabel.font = UIFont.boldSystemFont(ofSize: 24)
+        statusLabel.font = UIFont.boldSystemFont(ofSize: 14)
         statusLabel.textAlignment = .center
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(statusLabel)
         
-        // Score labels container
+        // Score labels container - in a scroll view for landscape
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.showsVerticalScrollIndicator = true
+        view.addSubview(scrollView)
+        
         scoreLabelsContainer = UIStackView()
         scoreLabelsContainer.axis = .vertical
         scoreLabelsContainer.alignment = .leading
-        scoreLabelsContainer.spacing = 8
+        scoreLabelsContainer.spacing = 6
         scoreLabelsContainer.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(scoreLabelsContainer)
+        scrollView.addSubview(scoreLabelsContainer)
         
-        // Buttons
-        if isViewOnly {
-            // Back button
-            backButton = UIButton(type: .system)
-            backButton.setTitle("BACK", for: .normal)
-            backButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 32)
-            backButton.setTitleColor(.green, for: .normal)
-            backButton.backgroundColor = UIColor(red: 0, green: 0.3, blue: 0, alpha: 0.6)
-            backButton.layer.cornerRadius = 10
-            backButton.layer.borderWidth = 2
-            backButton.layer.borderColor = UIColor.green.cgColor
-            backButton.translatesAutoresizingMaskIntoConstraints = false
-            backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
-            view.addSubview(backButton)
-            
-            // GameCenter button (if authenticated)
-            if GameCenterManager.shared.isAuthenticated {
-                gameCenterButton = UIButton(type: .system)
-                gameCenterButton.setTitle("🎮 FULL LEADERBOARD", for: .normal)
-                gameCenterButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 28)
-                gameCenterButton.setTitleColor(.cyan, for: .normal)
-                gameCenterButton.backgroundColor = UIColor(red: 0, green: 0.3, blue: 0.5, alpha: 0.6)
-                gameCenterButton.layer.cornerRadius = 10
-                gameCenterButton.layer.borderWidth = 2
-                gameCenterButton.layer.borderColor = UIColor.cyan.cgColor
-                gameCenterButton.translatesAutoresizingMaskIntoConstraints = false
-                gameCenterButton.addTarget(self, action: #selector(gameCenterTapped), for: .touchUpInside)
-                view.addSubview(gameCenterButton)
-            }
+        // Buttons - always create them
+        // Back button - positioned in top right
+        backButton = UIButton(type: .system)
+        backButton.setTitle("◀ BACK", for: .normal)
+        backButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 20)
+        backButton.setTitleColor(.green, for: .normal)
+        backButton.backgroundColor = UIColor(red: 0, green: 0.3, blue: 0, alpha: 0.8)
+        backButton.layer.cornerRadius = 8
+        backButton.layer.borderWidth = 2
+        backButton.layer.borderColor = UIColor.green.cgColor
+        backButton.translatesAutoresizingMaskIntoConstraints = false
+        backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        backButton.isHidden = !isViewOnly  // Hidden during score entry
+        view.addSubview(backButton)
+        
+        // GameCenter button (if authenticated) - positioned in top left
+        if GameCenterManager.shared.isAuthenticated {
+            gameCenterButton = UIButton(type: .system)
+            gameCenterButton.setTitle("🎮", for: .normal)
+            gameCenterButton.titleLabel?.font = UIFont.systemFont(ofSize: 28)
+            gameCenterButton.backgroundColor = UIColor(red: 0, green: 0.3, blue: 0.5, alpha: 0.8)
+            gameCenterButton.layer.cornerRadius = 8
+            gameCenterButton.layer.borderWidth = 2
+            gameCenterButton.layer.borderColor = UIColor.cyan.cgColor
+            gameCenterButton.translatesAutoresizingMaskIntoConstraints = false
+            gameCenterButton.addTarget(self, action: #selector(gameCenterTapped), for: .touchUpInside)
+            gameCenterButton.isHidden = !isViewOnly  // Hidden during score entry
+            view.addSubview(gameCenterButton)
         }
         
-        // Layout
+        // Layout constraints - optimized for landscape
         var constraints: [NSLayoutConstraint] = [
-            promptLabel.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 30),
+            // Title at top, compact spacing
+            promptLabel.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 10),
             promptLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            promptLabel.leadingAnchor.constraint(greaterThanOrEqualTo: safeArea.leadingAnchor, constant: 20),
-            promptLabel.trailingAnchor.constraint(lessThanOrEqualTo: safeArea.trailingAnchor, constant: -20),
+            promptLabel.leadingAnchor.constraint(greaterThanOrEqualTo: safeArea.leadingAnchor, constant: 120),
+            promptLabel.trailingAnchor.constraint(lessThanOrEqualTo: safeArea.trailingAnchor, constant: -120),
             
-            initialsLabel.topAnchor.constraint(equalTo: promptLabel.bottomAnchor, constant: 20),
+            // Initials below title
+            initialsLabel.topAnchor.constraint(equalTo: promptLabel.bottomAnchor, constant: 5),
             initialsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             
-            statusLabel.topAnchor.constraint(equalTo: initialsLabel.bottomAnchor, constant: isViewOnly ? 20 : 40),
+            // Status below initials
+            statusLabel.topAnchor.constraint(equalTo: initialsLabel.bottomAnchor, constant: isViewOnly ? 5 : 10),
             statusLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             
-            scoreLabelsContainer.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 20),
-            scoreLabelsContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            scoreLabelsContainer.leadingAnchor.constraint(greaterThanOrEqualTo: safeArea.leadingAnchor, constant: 40),
-            scoreLabelsContainer.trailingAnchor.constraint(lessThanOrEqualTo: safeArea.trailingAnchor, constant: -40)
+            // ScrollView for scores - takes remaining space
+            scrollView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),
+            scrollView.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: 20),
+            scrollView.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -20),
+            scrollView.bottomAnchor.constraint(equalTo: safeArea.bottomAnchor, constant: -10),
+            
+            // Score container inside scroll view
+            scoreLabelsContainer.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            scoreLabelsContainer.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 20),
+            scoreLabelsContainer.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -20),
+            scoreLabelsContainer.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            scoreLabelsContainer.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -40)
         ]
         
-        if isViewOnly {
+        // Button constraints - always add them since buttons are always created
+        constraints.append(contentsOf: [
+            // Back button in top right corner
+            backButton.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 10),
+            backButton.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -10),
+            backButton.widthAnchor.constraint(equalToConstant: 100),
+            backButton.heightAnchor.constraint(equalToConstant: 40)
+        ])
+        
+        if gameCenterButton != nil {
             constraints.append(contentsOf: [
-                backButton.bottomAnchor.constraint(equalTo: safeArea.bottomAnchor, constant: -20),
-                backButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                backButton.widthAnchor.constraint(equalToConstant: 180),
-                backButton.heightAnchor.constraint(equalToConstant: 60)
+                // GameCenter button in top left corner
+                gameCenterButton.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: 10),
+                gameCenterButton.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: 10),
+                gameCenterButton.widthAnchor.constraint(equalToConstant: 50),
+                gameCenterButton.heightAnchor.constraint(equalToConstant: 40)
             ])
-            
-            if gameCenterButton != nil {
-                constraints.append(contentsOf: [
-                    gameCenterButton.bottomAnchor.constraint(equalTo: backButton.topAnchor, constant: -15),
-                    gameCenterButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                    gameCenterButton.widthAnchor.constraint(equalToConstant: 300),
-                    gameCenterButton.heightAnchor.constraint(equalToConstant: 60)
-                ])
-            }
         }
         
         NSLayoutConstraint.activate(constraints)
         
-        showLeaderboard()
+        // Load scores AFTER UI is fully set up
+        loadScores()
         
         if isEntry {
             showInitialsKeyboard()
         }
+    }
+
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // Display leaderboard when view is about to appear (safer than viewDidLoad)
+        showLeaderboard()
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // Cancel any pending updates when view disappears
+        print("🏆 LeaderboardScene3D: viewDidDisappear - view is no longer visible")
     }
     
     private func showInitialsKeyboard() {
@@ -182,6 +203,13 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
         let updatedText = currentText.replacingCharacters(in: stringRange, with: string)
         let allowed = updatedText.uppercased().filter { $0.isLetter }
         if allowed.count > 3 { return false }
+        
+        // Safely update initialsLabel
+        guard let initialsLabel = initialsLabel else {
+            print("⚠️ initialsLabel is nil in textField delegate")
+            return false
+        }
+        
         initialsLabel.text = allowed + String(repeating: "_", count: 3 - allowed.count)
         return allowed.count <= 3
     }
@@ -195,7 +223,17 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
             initialsField = nil
             saveScore()
             showLeaderboard()
-            promptLabel.text = "Score Saved!\nTap Back to return"
+            
+            // Show the back button now that score is saved
+            backButton?.isHidden = false
+            gameCenterButton?.isHidden = false
+            
+            // Safely update promptLabel
+            if let promptLabel = promptLabel {
+                promptLabel.text = "Score Saved!\nTap Back to return"
+            } else {
+                print("⚠️ promptLabel is nil in textFieldShouldReturn")
+            }
             return true
         } else if entered.isEmpty {
             textField.resignFirstResponder()
@@ -251,7 +289,16 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
         if GameCenterManager.shared.isAuthenticated {
             GameCenterManager.shared.loadLeaderboard { [weak self] gameCenterScores in
                 DispatchQueue.main.async {
-                    guard let self = self else { return }
+                    guard let self = self else {
+                        print("⚠️ LeaderboardScene3D: self is nil in GameCenter callback")
+                        return
+                    }
+                    
+                    // Check if view is still loaded
+                    guard self.isViewLoaded else {
+                        print("⚠️ LeaderboardScene3D: view not loaded in GameCenter callback")
+                        return
+                    }
                     
                     self.scores.removeAll()
                     
@@ -266,9 +313,11 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
                         self.scores.append(("GameCenter", 0, "Unavailable"))
                     }
                     
-                    // Only update display if UI is ready
-                    if self.scoreLabelsContainer != nil {
+                    // Only update display if UI is ready and view is in window
+                    if self.scoreLabelsContainer != nil && self.view.window != nil {
                         self.showLeaderboard()
+                    } else {
+                        print("⚠️ LeaderboardScene3D: Cannot update UI - scoreLabelsContainer=\(self.scoreLabelsContainer != nil), inWindow=\(self.view.window != nil)")
                     }
                 }
             }
@@ -276,8 +325,31 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
     }
     
     private func showLeaderboard() {
-        // Clear existing score labels
-        scoreLabelsContainer.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        // Ensure we're on main thread
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.showLeaderboard()
+            }
+            return
+        }
+        
+        // Guard against nil scoreLabelsContainer
+        guard let scoreLabelsContainer = scoreLabelsContainer else {
+            print("⚠️ scoreLabelsContainer is nil in showLeaderboard()")
+            return
+        }
+        
+        // Guard against view not being in window hierarchy
+        guard view.window != nil else {
+            print("⚠️ view not in window hierarchy in showLeaderboard()")
+            return
+        }
+        
+        // Clear existing score labels safely
+        for subview in scoreLabelsContainer.arrangedSubviews {
+            scoreLabelsContainer.removeArrangedSubview(subview)
+            subview.removeFromSuperview()
+        }
         
         // Add score entries
         for (i, entry) in scores.prefix(maxScores).enumerated() {
@@ -286,14 +358,21 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
             if entry.1 == 0 && (entry.0.contains("GameCenter") || entry.0.contains("No scores")) {
                 entryLabel.text = entry.0
                 entryLabel.textColor = .gray
+                entryLabel.font = UIFont.monospacedSystemFont(ofSize: 18, weight: .bold)
             } else {
                 // Use monospaced font for proper alignment
-                entryLabel.font = UIFont.monospacedSystemFont(ofSize: 24, weight: .bold)
-                entryLabel.text = String(format: "%2d. %-12s %,6d pts %s", i+1, entry.0, entry.1, entry.2)
+                entryLabel.font = UIFont.monospacedSystemFont(ofSize: 18, weight: .bold)
+                
+                // Safely format the string without C-style format specifiers
+                let rank = String(format: "%2d", i + 1)
+                let name = entry.0.padding(toLength: 12, withPad: " ", startingAt: 0)
+                let score = String(format: "%,6d", entry.1)
+                let date = entry.2
+                
+                entryLabel.text = "\(rank). \(name) \(score) pts \(date)"
                 entryLabel.textColor = i == 0 ? UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0) : .white
             }
             
-            entryLabel.font = UIFont.monospacedSystemFont(ofSize: 24, weight: .bold)
             entryLabel.numberOfLines = 1
             entryLabel.adjustsFontSizeToFitWidth = true
             entryLabel.minimumScaleFactor = 0.5
@@ -301,6 +380,7 @@ class LeaderboardScene3D: UIViewController, UITextFieldDelegate {
             scoreLabelsContainer.addArrangedSubview(entryLabel)
         }
     }
+
     
     override var prefersStatusBarHidden: Bool {
         return true

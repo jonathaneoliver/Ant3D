@@ -9,6 +9,9 @@ struct GameConfig: Codable {
     var shadowsEnabled: Bool
     var orbitSearchDelay: Float // Delay in seconds before starting orbit search when ball is hidden (default: 10.0)
     var showDebugHUD: Bool      // Show debug HUD elements (connection status, visibility, distance) - defaults to false
+    var showsStatistics: Bool   // Show FPS and performance stats - defaults to false
+    var fogStartDistance: Float // Distance where fog starts (default: 40.0)
+    var fogEndDistance: Float   // Distance where fog ends (default: 80.0)
     var lastUpdated: Int64
 }
 
@@ -58,6 +61,9 @@ class ConfigManager {
         shadowsEnabled: false,
         orbitSearchDelay: 10.0,  // Default: wait 10 seconds before starting orbit search
         showDebugHUD: false,     // Default: debug HUD hidden
+        showsStatistics: false,  // Default: FPS stats hidden
+        fogStartDistance: 40.0,  // Default: fog starts at 40 units
+        fogEndDistance: 80.0,    // Default: fog ends at 80 units
         lastUpdated: 0
     )
     
@@ -84,7 +90,6 @@ class ConfigManager {
         print("========================================")
         NSLog("🌐 ConfigManager: Starting to poll server at %@", url)
         os_log("🌐 ConfigManager: Starting to poll server at %@", type: .error, url)
-        FileLogger.shared.log("🌐 ConfigManager: Starting to poll \(url)")
         
         // Fetch immediately
         fetchConfig()
@@ -171,8 +176,11 @@ class ConfigManager {
                abs(newConfig.droneDistance - config.droneDistance) > 0.01 ||
                abs(newConfig.ambientLight - config.ambientLight) > 0.01 ||
                abs(newConfig.orbitSearchDelay - config.orbitSearchDelay) > 0.01 ||
+               abs(newConfig.fogStartDistance - config.fogStartDistance) > 0.01 ||
+               abs(newConfig.fogEndDistance - config.fogEndDistance) > 0.01 ||
                newConfig.shadowsEnabled != config.shadowsEnabled ||
-               newConfig.showDebugHUD != config.showDebugHUD
+               newConfig.showDebugHUD != config.showDebugHUD ||
+               newConfig.showsStatistics != config.showsStatistics
     }
     
     // MARK: - Map Loading

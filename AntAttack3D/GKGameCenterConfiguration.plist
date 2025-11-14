@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>GKLeaderboards</key>
+    <array>
+        <dict>
+            <key>GKLeaderboardID</key>
+            <string>antattack3d_highscores</string>
+            <key>GKLeaderboardTitle</key>
+            <string>High Scores</string>
+            <key>GKLeaderboardGroupIdentifier</key>
+            <string></string>
+            <key>GKLeaderboardRecurrenceRule</key>
+            <string>GKLeaderboardRecurrenceRuleNever</string>
+            <key>GKLeaderboardRecurrenceDuration</key>
+            <integer>0</integer>
+            <key>GKLeaderboardStartDate</key>
+            <date>2025-01-01T00:00:00Z</date>
+            <key>GKLeaderboardImage</key>
+            <string></string>
+            <key>GKLeaderboardScoreFormatType</key>
+            <string>GKLeaderboardScoreFormatTypeNumeric</string>
+            <key>GKLeaderboardScoreFormatSuffix</key>
+            <string> pts</string>
+            <key>GKLeaderboardScoreSubmissionType</key>
+            <string>GKLeaderboardScoreSubmissionTypeBestScore</string>
+            <key>GKLeaderboardSortOrder</key>
+            <string>GKLeaderboardSortOrderHighToLow</string>
+        </dict>
+    </array>
+    <key>GKAchievements</key>
+    <array>
+        <dict>
+            <key>GKAchievementID</key>
+            <string>antattack3d_first_rescue</string>
+            <key>GKAchievementTitle</key>
+            <string>First Rescue</string>
+            <key>GKAchievementUnachievedDescription</key>
+            <string>Rescue your first hostage</string>
+            <key>GKAchievementAchievedDescription</key>
+            <string>You rescued your first hostage!</string>
+            <key>GKAchievementMaximumPoints</key>
+            <integer>10</integer>
+            <key>GKAchievementHidden</key>
+            <false/>
+            <key>GKAchievementReplayable</key>
+            <false/>
+            <key>GKAchievementImage</key>
+            <string></string>
+        </dict>
+        <dict>
+            <key>GKAchievementID</key>
+            <string>antattack3d_score_1000</string>
+            <key>GKAchievementTitle</key>
+            <string>Getting Started</string>
+            <key>GKAchievementUnachievedDescription</key>
+            <string>Score 1,000 points</string>
+            <key>GKAchievementAchievedDescription</key>
+            <string>You scored 1,000 points!</string>
+            <key>GKAchievementMaximumPoints</key>
+            <integer>20</integer>
+            <key>GKAchievementHidden</key>
+            <false/>
+            <key>GKAchievementReplayable</key>
+            <false/>
+            <key>GKAchievementImage</key>
+            <string></string>
+        </dict>
+        <dict>
+            <key>GKAchievementID</key>
+            <string>antattack3d_score_5000</string>
+            <key>GKAchievementTitle</key>
+            <string>Ant Warrior</string>
+            <key>GKAchievementUnachievedDescription</key>
+            <string>Score 5,000 points</string>
+            <key>GKAchievementAchievedDescription</key>
+            <string>You scored 5,000 points!</string>
+            <key>GKAchievementMaximumPoints</key>
+            <integer>50</integer>
+            <key>GKAchievementHidden</key>
+            <false/>
+            <key>GKAchievementReplayable</key>
+            <false/>
+            <key>GKAchievementImage</key>
+            <string></string>
+        </dict>
+        <dict>
+            <key>GKAchievementID</key>
+            <string>antattack3d_rescue_10</string>
+            <key>GKAchievementTitle</key>
+            <string>Hero</string>
+            <key>GKAchievementUnachievedDescription</key>
+            <string>Rescue 10 hostages</string>
+            <key>GKAchievementAchievedDescription</key>
+            <string>You rescued 10 hostages!</string>
+            <key>GKAchievementMaximumPoints</key>
+            <integer>100</integer>
+            <key>GKAchievementHidden</key>
+            <false/>
+            <key>GKAchievementReplayable</key>
+            <false/>
+            <key>GKAchievementImage</key>
+            <string></string>
+        </dict>
+    </array>
+</dict>
+</plist>

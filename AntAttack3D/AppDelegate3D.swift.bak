@@ -1,7 +1,6 @@
 import UIKit
 import SceneKit
 import os.log
-import GameKit
 
 // File logging helper
 class FileLogger {

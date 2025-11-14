@@ -19,7 +19,10 @@
 		CF123456789ABCDEF0123456 /* ConfigManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF123456789ABCDEF0123455 /* ConfigManager.swift */; };
 		D9E9730A004C4AACA7FB2D40 /* CityMap3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */; };
 		EB123456789ABCDEF0123456 /* EnemyBall.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB123456789ABCDEF0123455 /* EnemyBall.swift */; };
-		HO123456789ABCDEF0123456 /* Hostage.swift in Sources */ = {isa = PBXBuildFile; fileRef = HO123456789ABCDEF0123455 /* Hostage.swift */; };
+		HO123456789ABCDEF0123456 /* Hostage.swift in Sources */ = {isa = PBXBuildFile; fileRef = HO123456789ABCDEF0123455 /* Hostage.swift */; };		346435613163373830393966 /* GKGameCenterConfiguration.plist in Resources */ = {isa = PBXBuildFile; fileRef = 323662323334303735633133 /* GKGameCenterConfiguration.plist */; };
+
+
+		LS1234567890ABCDEF02 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = LS1234567890ABCDEF01 /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,7 +42,10 @@
 		CF123456789ABCDEF0123455 /* ConfigManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigManager.swift; sourceTree = "<group>"; };
 		D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityMap3D.swift; sourceTree = "<group>"; };
 		EB123456789ABCDEF0123455 /* EnemyBall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnemyBall.swift; sourceTree = "<group>"; };
-		HO123456789ABCDEF0123455 /* Hostage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hostage.swift; sourceTree = "<group>"; };
+		HO123456789ABCDEF0123455 /* Hostage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hostage.swift; sourceTree = "<group>"; };		323662323334303735633133 /* GKGameCenterConfiguration.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = GKGameCenterConfiguration.plist; sourceTree = "<group>"; };
+
+
+		LS1234567890ABCDEF01 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,7 +78,9 @@
 				HO123456789ABCDEF0123455 /* Hostage.swift */,
 				AA123456789ABCDEF0123455 /* ant_attack_original.json */,
 				0C9D6469006E49198136897C /* Info.plist */,
-			);
+				323662323334303735633133 /* GKGameCenterConfiguration.plist */,
+			
+				LS1234567890ABCDEF01 /* LaunchScreen.storyboard */,);
 			path = AntAttack3D;
 			sourceTree = "<group>";
 		};
@@ -151,7 +159,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA123456789ABCDEF0123456 /* ant_attack_original.json in Resources */,
-			);
+			
+				346435613163373830393966 /* GKGameCenterConfiguration.plist in Resources */,
+				LS1234567890ABCDEF02 /* LaunchScreen.storyboard in Resources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */

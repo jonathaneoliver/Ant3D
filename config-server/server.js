@@ -21,6 +21,9 @@ let config = {
   shadowsEnabled: false,  // Enable/disable shadows
   orbitSearchDelay: 10.0, // Delay in seconds before starting orbit search when ball is hidden
   showDebugHUD: false,    // Show debug HUD elements (connection status, visibility, distance)
+  showsStatistics: false, // Show FPS statistics overlay
+  fogStartDistance: 40.0, // Fog start distance (10-100)
+  fogEndDistance: 80.0,   // Fog end distance (20-150)
   lastUpdated: Date.now()
 };
 
@@ -51,18 +54,18 @@ app.get('/api/config', (req, res) => {
   const userAgent = req.get('User-Agent') || 'Unknown';
   
   console.log(`📱 App polling config - IP: ${clientIP}, UA: ${userAgent}`);
-  console.log(`   Sending: angle=${config.droneAngle}, distance=${config.droneDistance}, ambient=${config.ambientLight}, shadows=${config.shadowsEnabled}, orbitDelay=${config.orbitSearchDelay}, showDebugHUD=${config.showDebugHUD}`);
+  console.log(`   Sending: angle=${config.droneAngle}, distance=${config.droneDistance}, ambient=${config.ambientLight}, shadows=${config.shadowsEnabled}, orbitDelay=${config.orbitSearchDelay}, showDebugHUD=${config.showDebugHUD}, stats=${config.showsStatistics}, fogStart=${config.fogStartDistance}, fogEnd=${config.fogEndDistance}`);
   
   res.json(config);
 });
 
 // POST endpoint - Web UI updates this
 app.post('/api/config', (req, res) => {
-  const { droneAngle, droneDistance, ambientLight, shadowsEnabled, orbitSearchDelay, showDebugHUD } = req.body;
+  const { droneAngle, droneDistance, ambientLight, shadowsEnabled, orbitSearchDelay, showDebugHUD, showsStatistics, fogStartDistance, fogEndDistance } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
   
   console.log(`\n🎛️  CONFIG UPDATE from ${clientIP}`);
-  console.log(`   Previous: angle=${config.droneAngle}, distance=${config.droneDistance}, ambient=${config.ambientLight}, shadows=${config.shadowsEnabled}, orbitDelay=${config.orbitSearchDelay}, showDebugHUD=${config.showDebugHUD}`);
+  console.log(`   Previous: angle=${config.droneAngle}, distance=${config.droneDistance}, ambient=${config.ambientLight}, shadows=${config.shadowsEnabled}, orbitDelay=${config.orbitSearchDelay}, showDebugHUD=${config.showDebugHUD}, stats=${config.showsStatistics}, fogStart=${config.fogStartDistance}, fogEnd=${config.fogEndDistance}`);
   
   if (droneAngle !== undefined) {
     config.droneAngle = parseFloat(droneAngle);
@@ -82,10 +85,19 @@ app.post('/api/config', (req, res) => {
   if (showDebugHUD !== undefined) {
     config.showDebugHUD = Boolean(showDebugHUD);
   }
+  if (showsStatistics !== undefined) {
+    config.showsStatistics = Boolean(showsStatistics);
+  }
+  if (fogStartDistance !== undefined) {
+    config.fogStartDistance = parseFloat(fogStartDistance);
+  }
+  if (fogEndDistance !== undefined) {
+    config.fogEndDistance = parseFloat(fogEndDistance);
+  }
   
   config.lastUpdated = Date.now();
   
-  console.log(`   New:      angle=${config.droneAngle}, distance=${config.droneDistance}, ambient=${config.ambientLight}, shadows=${config.shadowsEnabled}, orbitDelay=${config.orbitSearchDelay}, showDebugHUD=${config.showDebugHUD}`);
+  console.log(`   New:      angle=${config.droneAngle}, distance=${config.droneDistance}, ambient=${config.ambientLight}, shadows=${config.shadowsEnabled}, orbitDelay=${config.orbitSearchDelay}, showDebugHUD=${config.showDebugHUD}, stats=${config.showsStatistics}, fogStart=${config.fogStartDistance}, fogEnd=${config.fogEndDistance}`);
   console.log(`   Updated at: ${new Date(config.lastUpdated).toISOString()}\n`);
   
   res.json(config);

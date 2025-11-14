@@ -14,12 +14,14 @@ class GameViewController3D: UIViewController {
     var debugLabel: UILabel!  // Big visible debug label
     var visibilityLabel: UILabel!  // Ball visibility indicator
     var distanceLabel: UILabel!  // Camera distance from ball
-    var hostageLabel: UILabel!  // Hostage rescue counter
+    var hostageStackView: UIStackView!  // Container for heart icons
+    var hostageHearts: [UILabel] = []  // Individual heart labels
     var scoreLabel: UILabel!  // Score display
     var levelLabel: UILabel!  // Current level display
     var miniMapView: UIView!  // Mini-map showing hostage locations
     var miniMapDots: [UIView] = []  // Blue dots for hostages
     var miniMapPlayerDot: UIView?  // Red dot for player position
+    var miniMapSafeMatIndicator: UIView?  // Blue square for safe mat area
     var axisView: SCNView!  // 3D axis indicator
     var controller: GCController?
     
@@ -39,10 +41,18 @@ class GameViewController3D: UIViewController {
         
         FileLogger.shared.log("✅ Creating SceneView")
         
-        // Create and configure the SceneKit view
-        sceneView = SCNView(frame: view.bounds)
-        sceneView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Create SceneView with Auto Layout to ensure edge-to-edge positioning
+        sceneView = SCNView()
+        sceneView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(sceneView)
+        
+        // Pin SceneView to ALL edges of the view (not safe area)
+        NSLayoutConstraint.activate([
+            sceneView.topAnchor.constraint(equalTo: view.topAnchor),
+            sceneView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sceneView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sceneView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
         
         NSLog("✅ SceneView created and added to view")
         FileLogger.shared.log("✅ SceneView created")
@@ -60,7 +70,7 @@ class GameViewController3D: UIViewController {
         // Configure the view
         sceneView.backgroundColor = UIColor(red: 0.59, green: 0.85, blue: 0.93, alpha: 1.0)
         sceneView.allowsCameraControl = false  // Disable built-in camera control so we can control zoom manually
-        sceneView.showsStatistics = true      // Show FPS and other stats
+        sceneView.showsStatistics = false     // Will be set by config (default: false)
         sceneView.autoenablesDefaultLighting = false  // We have our own lighting
         
         // Optional: Add antialiasing for smoother edges
@@ -70,9 +80,9 @@ class GameViewController3D: UIViewController {
         setupConnectionStatusHUD()
         setupVisibilityHUD()
         setupDistanceHUD()
-        setupScoreHUD()
-        setupLevelHUD()
         setupHostageHUD()
+        setupLevelHUD()
+        setupScoreHUD()
         setupMiniMap()
         
         // Set initial visibility to hidden (default state)
@@ -119,7 +129,8 @@ class GameViewController3D: UIViewController {
         // Setup config update listener for debug HUD visibility AND forward to game scene
         ConfigManager.shared.onConfigUpdate = { [weak self] config in
             self?.updateDebugHUDVisibility(config.showDebugHUD)
-            // Forward config update to game scene for camera/lighting updates
+            self?.sceneView.showsStatistics = config.showsStatistics
+            // Forward config update to game scene for camera/lighting/fog updates
             self?.gameScene.onConfigReceived(config)
         }
         
@@ -321,29 +332,37 @@ class GameViewController3D: UIViewController {
     
     func setupHostageHUD() {
         
-        // Create hostage label
-        hostageLabel = UILabel()
-        hostageLabel.translatesAutoresizingMaskIntoConstraints = false
-        hostageLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
-        hostageLabel.textColor = .cyan
-        hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-        hostageLabel.textAlignment = .center
-        hostageLabel.numberOfLines = 1
-        hostageLabel.text = " 💙 Remaining: 0/0 "
-        hostageLabel.layer.cornerRadius = 6
-        hostageLabel.layer.masksToBounds = true
-        hostageLabel.adjustsFontSizeToFitWidth = true
-        hostageLabel.minimumScaleFactor = 0.7
+        // Create horizontal stack view for hearts
+        hostageStackView = UIStackView()
+        hostageStackView.translatesAutoresizingMaskIntoConstraints = false
+        hostageStackView.axis = .horizontal
+        hostageStackView.spacing = 2
+        hostageStackView.alignment = .center
+        hostageStackView.distribution = .equalSpacing
+        hostageStackView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        hostageStackView.layer.cornerRadius = 4
+        hostageStackView.layer.masksToBounds = true
+        hostageStackView.layoutMargins = UIEdgeInsets(top: 3, left: 5, bottom: 3, right: 5)
+        hostageStackView.isLayoutMarginsRelativeArrangement = true
         
-        view.addSubview(hostageLabel)
+        view.addSubview(hostageStackView)
         
-        // Position at top-center, to the left of level label (matches HUD style)
+        // Position at top-left, very close to edge
         NSLayoutConstraint.activate([
-            hostageLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            hostageLabel.trailingAnchor.constraint(equalTo: levelLabel.leadingAnchor, constant: -10),
-            hostageLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
-            hostageLabel.heightAnchor.constraint(equalToConstant: 32)
+            hostageStackView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2),
+            hostageStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 2),
+            hostageStackView.heightAnchor.constraint(equalToConstant: 28)
         ])
+        
+        // Initialize with 5 hearts (will be updated dynamically based on actual hostage count)
+        for _ in 0..<5 {
+            let heartLabel = UILabel()
+            heartLabel.font = UIFont.systemFont(ofSize: 20)  // Smaller hearts
+            heartLabel.text = "💙"  // Blue heart for not-yet-rescued
+            heartLabel.textAlignment = .center
+            hostageStackView.addArrangedSubview(heartLabel)
+            hostageHearts.append(heartLabel)
+        }
         
     }
     
@@ -351,21 +370,37 @@ class GameViewController3D: UIViewController {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            let remaining = total - saved
+            // Ensure we have the right number of hearts
+            if self.hostageHearts.count != total {
+                // Remove all existing hearts
+                self.hostageHearts.forEach { $0.removeFromSuperview() }
+                self.hostageHearts.removeAll()
+                
+                // Create new hearts for the actual total
+                for _ in 0..<total {
+                    let heartLabel = UILabel()
+                    heartLabel.font = UIFont.systemFont(ofSize: 32)
+                    heartLabel.text = "💙"  // Blue heart for not-yet-rescued
+                    heartLabel.textAlignment = .center
+                    self.hostageStackView.addArrangedSubview(heartLabel)
+                    self.hostageHearts.append(heartLabel)
+                }
+            }
             
-            // Update label to show remaining hostages
-            self.hostageLabel.text = String(format: " 💙 Remaining: %d/%d ", remaining, total)
+            // Update heart colors: first 'saved' hearts are white, rest are blue
+            for (index, heartLabel) in self.hostageHearts.enumerated() {
+                if index < saved {
+                    heartLabel.text = "🤍"  // White heart for rescued
+                } else {
+                    heartLabel.text = "💙"  // Blue heart for not-yet-rescued
+                }
+            }
             
-            // Change color based on status
+            // Change background color based on status
             if saved == total && total > 0 {
-                self.hostageLabel.textColor = .green  // All saved!
-                self.hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-            } else if saved > 0 {
-                self.hostageLabel.textColor = .cyan  // Some saved
-                self.hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+                self.hostageStackView.backgroundColor = UIColor.green.withAlphaComponent(0.3)  // All saved!
             } else {
-                self.hostageLabel.textColor = .yellow  // None saved yet
-                self.hostageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+                self.hostageStackView.backgroundColor = UIColor.black.withAlphaComponent(0.7)  // In progress
             }
         }
     }
@@ -377,25 +412,24 @@ class GameViewController3D: UIViewController {
         // Create score label
         scoreLabel = UILabel()
         scoreLabel.translatesAutoresizingMaskIntoConstraints = false
-        scoreLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        scoreLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .bold)
         scoreLabel.textColor = .yellow
-        scoreLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        scoreLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
         scoreLabel.textAlignment = .center
         scoreLabel.numberOfLines = 1
-        scoreLabel.text = " 🏆 Score: 0 "
-        scoreLabel.layer.cornerRadius = 6
+        scoreLabel.text = " 🏆 0 "
+        scoreLabel.layer.cornerRadius = 4
         scoreLabel.layer.masksToBounds = true
         scoreLabel.adjustsFontSizeToFitWidth = true
         scoreLabel.minimumScaleFactor = 0.7
         
         view.addSubview(scoreLabel)
         
-        // Position at top-center of screen (horizontal, no rotation)
+        // Position at top-left, below level label, close to edge
         NSLayoutConstraint.activate([
-            scoreLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            scoreLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            scoreLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 140),
-            scoreLabel.heightAnchor.constraint(equalToConstant: 32)
+            scoreLabel.topAnchor.constraint(equalTo: levelLabel.bottomAnchor, constant: 3),
+            scoreLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 2),
+            scoreLabel.heightAnchor.constraint(equalToConstant: 22)
         ])
         
     }
@@ -405,9 +439,9 @@ class GameViewController3D: UIViewController {
             guard let self = self else { return }
             
             // Update label with current score
-            self.scoreLabel.text = String(format: " 🏆 Score: %d ", score)
+            self.scoreLabel.text = String(format: " 🏆 %d ", score)
             self.scoreLabel.textColor = .yellow
-            self.scoreLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+            self.scoreLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
         }
     }
     
@@ -415,28 +449,27 @@ class GameViewController3D: UIViewController {
     
     func setupLevelHUD() {
         
-        // Create level label (to the left of score label)
+        // Create level label
         levelLabel = UILabel()
         levelLabel.translatesAutoresizingMaskIntoConstraints = false
-        levelLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        levelLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .bold)
         levelLabel.textColor = .cyan
-        levelLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        levelLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
         levelLabel.textAlignment = .center
         levelLabel.numberOfLines = 1
-        levelLabel.text = " 🎮 Level: 1 "
-        levelLabel.layer.cornerRadius = 6
+        levelLabel.text = " 🎮 1 "
+        levelLabel.layer.cornerRadius = 4
         levelLabel.layer.masksToBounds = true
         levelLabel.adjustsFontSizeToFitWidth = true
         levelLabel.minimumScaleFactor = 0.7
         
         view.addSubview(levelLabel)
         
-        // Position at top-center, to the left of score label
+        // Position at top-left, below hearts, close to edge
         NSLayoutConstraint.activate([
-            levelLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            levelLabel.trailingAnchor.constraint(equalTo: scoreLabel.leadingAnchor, constant: -10),
-            levelLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
-            levelLabel.heightAnchor.constraint(equalToConstant: 32)
+            levelLabel.topAnchor.constraint(equalTo: hostageStackView.bottomAnchor, constant: 3),
+            levelLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 2),
+            levelLabel.heightAnchor.constraint(equalToConstant: 22)
         ])
         
     }
@@ -446,20 +479,20 @@ class GameViewController3D: UIViewController {
             guard let self = self else { return }
             
             // Update label with current level
-            self.levelLabel.text = String(format: " 🎮 Level: %d ", level)
+            self.levelLabel.text = String(format: " 🎮 %d ", level)
             self.levelLabel.textColor = .cyan
-            self.levelLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+            self.levelLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
         }
     }
     
     // MARK: - Mini-Map HUD
     
     func setupMiniMap() {
-        // Create mini-map container view (bottom-right corner)
+        // Create mini-map container view (top-right corner)
         miniMapView = UIView()
         miniMapView.translatesAutoresizingMaskIntoConstraints = false
         miniMapView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        miniMapView.layer.cornerRadius = 8
+        miniMapView.layer.cornerRadius = 6
         miniMapView.layer.masksToBounds = true
         miniMapView.layer.borderWidth = 2
         miniMapView.layer.borderColor = UIColor.cyan.cgColor
@@ -467,27 +500,13 @@ class GameViewController3D: UIViewController {
         
         view.addSubview(miniMapView)
         
-        // Position at bottom-right corner
-        let mapSize: CGFloat = 120
+        // Position at top-right, very close to edge, smaller size
+        let mapSize: CGFloat = 90
         NSLayoutConstraint.activate([
-            miniMapView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            miniMapView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            miniMapView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -2),
+            miniMapView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2),
             miniMapView.widthAnchor.constraint(equalToConstant: mapSize),
             miniMapView.heightAnchor.constraint(equalToConstant: mapSize)
-        ])
-        
-        // Add title label
-        let titleLabel = UILabel()
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text = "MAP"
-        titleLabel.font = UIFont.boldSystemFont(ofSize: 10)
-        titleLabel.textColor = .cyan
-        titleLabel.textAlignment = .center
-        miniMapView.addSubview(titleLabel)
-        
-        NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: miniMapView.topAnchor, constant: 2),
-            titleLabel.centerXAnchor.constraint(equalTo: miniMapView.centerXAnchor)
         ])
     }
     
@@ -500,16 +519,35 @@ class GameViewController3D: UIViewController {
         
         let mapWidth = Float(gameScene.cityMap.width)
         let mapHeight = Float(gameScene.cityMap.height)
-        let miniMapSize: CGFloat = 120
-        let mapArea: CGFloat = miniMapSize - 20  // Leave space for title and borders
+        let miniMapSize: CGFloat = 90
+        let mapArea: CGFloat = miniMapSize - 12  // Leave space for borders
         
         // Helper function to convert world position to mini-map coordinates
         func worldToMiniMap(x: Float, z: Float) -> (CGFloat, CGFloat) {
             let normalizedX = CGFloat(x / mapWidth)
             let normalizedZ = CGFloat(z / mapHeight)
-            let dotX = normalizedX * mapArea + 10
-            let dotY = normalizedZ * mapArea + 15  // +15 to account for title
+            let dotX = normalizedX * mapArea + 6
+            let dotY = normalizedZ * mapArea + 6  // No title, just border offset
             return (dotX, dotY)
+        }
+        
+        // Add safe mat indicator (blue square) - only create once
+        if miniMapSafeMatIndicator == nil {
+            let safeMatPos = gameScene.safeMatPosition
+            let (matX, matY) = worldToMiniMap(x: safeMatPos.x, z: safeMatPos.z)
+            
+            // Size based on safe mat radius (6 units diameter = ~10% of map)
+            let matSize: CGFloat = 12  // Slightly larger than player dot
+            
+            let safeMatView = UIView()
+            safeMatView.frame = CGRect(x: matX - matSize/2, y: matY - matSize/2, width: matSize, height: matSize)
+            safeMatView.backgroundColor = UIColor(red: 0.0, green: 0.3, blue: 1.0, alpha: 0.6)  // Bright blue matching 3D mat
+            safeMatView.layer.cornerRadius = 2  // Slightly rounded square
+            safeMatView.layer.borderWidth = 1
+            safeMatView.layer.borderColor = UIColor.white.cgColor
+            
+            miniMapView.addSubview(safeMatView)
+            miniMapSafeMatIndicator = safeMatView
         }
         
         // Add blue dots for each unsaved hostage
@@ -518,10 +556,10 @@ class GameViewController3D: UIViewController {
             let (dotX, dotY) = worldToMiniMap(x: pos.x, z: pos.z)
             
             let dot = UIView()
-            dot.frame = CGRect(x: dotX - 4, y: dotY - 4, width: 8, height: 8)
+            dot.frame = CGRect(x: dotX - 3, y: dotY - 3, width: 6, height: 6)
             dot.backgroundColor = UIColor(red: 0.3, green: 0.7, blue: 1.0, alpha: 1.0)  // Bright blue
-            dot.layer.cornerRadius = 4
-            dot.layer.borderWidth = 1
+            dot.layer.cornerRadius = 3
+            dot.layer.borderWidth = 0.5
             dot.layer.borderColor = UIColor.white.cgColor
             
             miniMapView.addSubview(dot)
@@ -536,17 +574,17 @@ class GameViewController3D: UIViewController {
             // Create player dot if it doesn't exist
             if miniMapPlayerDot == nil {
                 let playerDot = UIView()
-                playerDot.frame = CGRect(x: 0, y: 0, width: 10, height: 10)
+                playerDot.frame = CGRect(x: 0, y: 0, width: 8, height: 8)
                 playerDot.backgroundColor = UIColor.white
-                playerDot.layer.cornerRadius = 5
-                playerDot.layer.borderWidth = 2
+                playerDot.layer.cornerRadius = 4
+                playerDot.layer.borderWidth = 1
                 playerDot.layer.borderColor = UIColor.black.cgColor
                 miniMapView.addSubview(playerDot)
                 miniMapPlayerDot = playerDot
             }
             
             // Update player dot position
-            miniMapPlayerDot?.frame = CGRect(x: playerX - 5, y: playerY - 5, width: 10, height: 10)
+            miniMapPlayerDot?.frame = CGRect(x: playerX - 4, y: playerY - 4, width: 8, height: 8)
         }
     }
     

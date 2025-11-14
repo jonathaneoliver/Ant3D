@@ -55,12 +55,19 @@ class MainNavigationController: UINavigationController {
             print("✅ gameScene exists, setting up callback")
             gameScene.onGameOver = { [weak self, weak gameVC] in
                 print("💀 Game Over! Getting final score...")
-                // Get final score
+                
+                // Pause the scene immediately to prevent further updates
+                gameVC?.sceneView?.scene?.isPaused = true
+                
+                // Get final score before any navigation
                 let finalScore = gameVC?.gameScene?.score ?? 0
                 print("💀 Final score: \(finalScore)")
                 
-                // Show leaderboard with score
-                self?.showLeaderboard(finalScore: finalScore)
+                // Delay navigation slightly to ensure scene is fully paused
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    // Show leaderboard with score
+                    self?.showLeaderboard(finalScore: finalScore)
+                }
             }
         } else {
             print("❌ Error: gameScene is nil after viewDidLoad!")
