@@ -1704,6 +1704,10 @@ class GameScene3D: SCNScene {
                 if hasLineOfSight(from: enemyPosition, to: playerPosition) {
                     logger.info("Enemy collision detected - caught by enemy!")
                     isGameOver = true  // Set flag to prevent multiple triggers
+                    
+                    // Submit score to Game Center
+                    GameCenterManager.shared.submitScore(score)
+                    
                     // Trigger game over
                     onGameOver?()
                     break  // Only trigger once

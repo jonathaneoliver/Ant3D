@@ -69,13 +69,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         NSLog("✅ Window created")
         FileLogger.shared.log("✅ Window created: \(UIScreen.main.bounds)")
         
-        FileLogger.shared.log("✅ Creating GameViewController3D")
+        FileLogger.shared.log("✅ Creating MainNavigationController")
         
-        // Create the view controller
-        let viewController = GameViewController3D()
-        window?.rootViewController = viewController
-        print("✅ View controller set: GameViewController3D")
-        NSLog("✅ View controller set: GameViewController3D")
+        // Create the navigation controller for scene transitions
+        let mainNavController = MainNavigationController()
+        window?.rootViewController = mainNavController
+        print("✅ View controller set: MainNavigationController")
+        NSLog("✅ View controller set: MainNavigationController")
         FileLogger.shared.log("✅ View controller set")
         
         window?.makeKeyAndVisible()

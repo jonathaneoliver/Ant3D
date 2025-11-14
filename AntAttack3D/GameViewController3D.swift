@@ -9,7 +9,7 @@ private let logger = Logger(subsystem: "com.example.AntAttack3D", category: "Gam
 class GameViewController3D: UIViewController {
     
     var sceneView: SCNView!
-    var gameScene: GameScene3D!
+    public var gameScene: GameScene3D!
     var connectionStatusLabel: UILabel!
     var debugLabel: UILabel!  // Big visible debug label
     var visibilityLabel: UILabel!  // Ball visibility indicator
@@ -571,7 +571,22 @@ class GameViewController3D: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        print("🎮 GameViewController viewDidAppear - becoming first responder")
         becomeFirstResponder()
+        
+        // Re-check for controllers when view appears (in case we missed it during init)
+        print("🎮 Re-checking for controllers in viewDidAppear...")
+        print("🎮 Number of controllers: \(GCController.controllers().count)")
+        if controller == nil && !GCController.controllers().isEmpty {
+            print("🎮 ⚠️ Controller was nil but controllers are available - reconnecting...")
+            if let gameController = GCController.controllers().first {
+                connectController(gameController)
+            }
+        } else if controller != nil {
+            print("🎮 ✅ Controller already connected: \(controller?.vendorName ?? "Unknown")")
+        } else {
+            print("🎮 ❌ No controllers available")
+        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -590,6 +605,7 @@ class GameViewController3D: UIViewController {
     // MARK: - Xbox Controller Support
     
     func setupGameController() {
+        print("🎮 setupGameController() called")
         
         // Watch for controller connections
         NotificationCenter.default.addObserver(
@@ -607,30 +623,41 @@ class GameViewController3D: UIViewController {
         )
         
         // Check if controller already connected
+        print("🎮 Checking for connected controllers...")
+        print("🎮 Number of controllers: \(GCController.controllers().count)")
         if let controller = GCController.controllers().first {
+            print("🎮 ✅ Controller found: \(controller.vendorName ?? "Unknown")")
             connectController(controller)
+        } else {
+            print("🎮 ❌ No controller connected")
         }
     }
     
     @objc func controllerDidConnect(_ notification: Notification) {
+        print("🎮 Controller CONNECTED notification received!")
         if let controller = notification.object as? GCController {
+            print("🎮 Controller: \(controller.vendorName ?? "Unknown")")
             connectController(controller)
         }
     }
     
     @objc func controllerDidDisconnect(_ notification: Notification) {
+        print("🎮 Controller DISCONNECTED!")
         controller = nil
     }
     
     func connectController(_ controller: GCController) {
+        print("🎮 connectController() called for: \(controller.vendorName ?? "Unknown")")
         self.controller = controller
         
         // Handle extended gamepad (Xbox, PlayStation, etc.)
         if let gamepad = controller.extendedGamepad {
+            print("🎮 ✅ Extended gamepad found - setting up handlers")
             
             // Left stick for ball movement
             gamepad.leftThumbstick.valueChangedHandler = { [weak self] (stick, xValue, yValue) in
                 // Y is inverted on game controllers
+                print("🕹️ Left stick: x=\(xValue), y=\(yValue)")
                 self?.gameScene.moveBall(x: xValue, z: -yValue)
             }
             
