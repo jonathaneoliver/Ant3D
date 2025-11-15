@@ -16,8 +16,8 @@ class GameViewController3D: UIViewController {
     var debugLabel: UILabel!  // Big visible debug label
     var visibilityLabel: UILabel!  // Ball visibility indicator
     var distanceLabel: UILabel!  // Camera distance from ball
-    var hostageStackView: UIStackView!  // Container for heart icons
-    var hostageHearts: [UILabel] = []  // Individual heart labels
+    var hostageStackView: UIStackView!  // Container for face icons
+    var hostageFaces: [UILabel] = []  // Individual hostage face icons
     var scoreLabel: UILabel!  // Score display
     var levelLabel: UILabel!  // Current level display
     var miniMapView: UIView!  // Mini-map showing hostage locations
@@ -34,6 +34,7 @@ class GameViewController3D: UIViewController {
     var lastMotionZ: Float = 0.0
     var climbButton: UIButton?
     var rotateButton: UIButton?
+    var controllerHasBeenUsed: Bool = false  // Track if controller input has been detected
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -347,7 +348,7 @@ class GameViewController3D: UIViewController {
     
     func setupHostageHUD() {
         
-        // Create horizontal stack view for hearts
+        // Create horizontal stack view for faces
         hostageStackView = UIStackView()
         hostageStackView.translatesAutoresizingMaskIntoConstraints = false
         hostageStackView.axis = .horizontal
@@ -369,14 +370,14 @@ class GameViewController3D: UIViewController {
             hostageStackView.heightAnchor.constraint(equalToConstant: 28)
         ])
         
-        // Initialize with 5 hearts (will be updated dynamically based on actual hostage count)
+        // Initialize with 5 faces (will be updated dynamically based on actual hostage count)
         for _ in 0..<5 {
-            let heartLabel = UILabel()
-            heartLabel.font = UIFont.systemFont(ofSize: 20)  // Smaller hearts
-            heartLabel.text = "💙"  // Blue heart for not-yet-rescued
-            heartLabel.textAlignment = .center
-            hostageStackView.addArrangedSubview(heartLabel)
-            hostageHearts.append(heartLabel)
+            let faceLabel = UILabel()
+            faceLabel.font = UIFont.systemFont(ofSize: 20)  // Smaller faces
+            faceLabel.text = "😢"  // Sad face for not-yet-rescued
+            faceLabel.textAlignment = .center
+            hostageStackView.addArrangedSubview(faceLabel)
+            hostageFaces.append(faceLabel)
         }
         
     }
@@ -385,29 +386,29 @@ class GameViewController3D: UIViewController {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // Ensure we have the right number of hearts
-            if self.hostageHearts.count != total {
-                // Remove all existing hearts
-                self.hostageHearts.forEach { $0.removeFromSuperview() }
-                self.hostageHearts.removeAll()
+            // Ensure we have the right number of faces
+            if self.hostageFaces.count != total {
+                // Remove all existing faces
+                self.hostageFaces.forEach { $0.removeFromSuperview() }
+                self.hostageFaces.removeAll()
                 
-                // Create new hearts for the actual total
+                // Create new faces for the actual total
                 for _ in 0..<total {
-                    let heartLabel = UILabel()
-                    heartLabel.font = UIFont.systemFont(ofSize: 32)
-                    heartLabel.text = "💙"  // Blue heart for not-yet-rescued
-                    heartLabel.textAlignment = .center
-                    self.hostageStackView.addArrangedSubview(heartLabel)
-                    self.hostageHearts.append(heartLabel)
+                    let faceLabel = UILabel()
+                    faceLabel.font = UIFont.systemFont(ofSize: 32)
+                    faceLabel.text = "😢"  // Sad face for not-yet-rescued
+                    faceLabel.textAlignment = .center
+                    self.hostageStackView.addArrangedSubview(faceLabel)
+                    self.hostageFaces.append(faceLabel)
                 }
             }
             
-            // Update heart colors: first 'saved' hearts are white, rest are blue
-            for (index, heartLabel) in self.hostageHearts.enumerated() {
+            // Update face colors: first 'saved' faces are white, rest are blue
+            for (index, faceLabel) in self.hostageFaces.enumerated() {
                 if index < saved {
-                    heartLabel.text = "🤍"  // White heart for rescued
+                    faceLabel.text = "😊"  // Happy face for rescued
                 } else {
-                    heartLabel.text = "💙"  // Blue heart for not-yet-rescued
+                    faceLabel.text = "😢"  // Sad face for not-yet-rescued
                 }
             }
             
@@ -480,7 +481,7 @@ class GameViewController3D: UIViewController {
         
         view.addSubview(levelLabel)
         
-        // Position at top-left, below hearts, close to edge
+        // Position at top-left, below faces, close to edge
         NSLayoutConstraint.activate([
             levelLabel.topAnchor.constraint(equalTo: hostageStackView.bottomAnchor, constant: 3),
             levelLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 2),
@@ -726,6 +727,11 @@ class GameViewController3D: UIViewController {
             
             // Left stick for ball movement
             gamepad.leftThumbstick.valueChangedHandler = { [weak self] (stick, xValue, yValue) in
+                // Mark controller as used when any significant input detected
+                if abs(xValue) > 0.1 || abs(yValue) > 0.1 {
+                    self?.controllerHasBeenUsed = true
+                    self?.hideOnScreenButtons()
+                }
                 // Y is inverted on game controllers
                 print("🕹️ Left stick: x=\(xValue), y=\(yValue)")
                 self?.gameScene.moveBall(x: xValue, z: -yValue)
@@ -733,6 +739,8 @@ class GameViewController3D: UIViewController {
             
             // A button for wall climbing (hold to climb)
             gamepad.buttonA.valueChangedHandler = { [weak self] (button, value, pressed) in
+                self?.controllerHasBeenUsed = true
+                self?.hideOnScreenButtons()
                 if pressed {
                     self?.gameScene.jumpBall()
                 } else {
@@ -744,6 +752,8 @@ class GameViewController3D: UIViewController {
             // B button rotates camera view by 45 degrees
             gamepad.buttonB.valueChangedHandler = { [weak self] (button, value, pressed) in
                 if pressed {
+                    self?.controllerHasBeenUsed = true
+                    self?.hideOnScreenButtons()
                     self?.gameScene.rotateCameraView()
                 }
             }
@@ -751,6 +761,8 @@ class GameViewController3D: UIViewController {
             // X button exits the game
             gamepad.buttonX.valueChangedHandler = { [weak self] (button, value, pressed) in
                 if pressed {
+                    self?.controllerHasBeenUsed = true
+                    self?.hideOnScreenButtons()
                     print("👋 X button pressed - Exiting game")
                     exit(0)
                 }
@@ -780,6 +792,11 @@ class GameViewController3D: UIViewController {
     }
     
     func updateMotionControls() {
+        // Don't use motion controls if a game controller has been actively used
+        if controllerHasBeenUsed {
+            return
+        }
+        
         guard let motionManager = motionManager,
               let data = motionManager.accelerometerData else { return }
         
@@ -830,15 +847,15 @@ class GameViewController3D: UIViewController {
         view.addSubview(rotateBtn)
         
         NSLayoutConstraint.activate([
-            // Climb button - bottom right
-            climbBtn.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            climbBtn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            // Climb button - absolute bottom right corner
+            climbBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            climbBtn.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
             climbBtn.widthAnchor.constraint(equalToConstant: 70),
             climbBtn.heightAnchor.constraint(equalToConstant: 70),
             
             // Rotate button - above climb button
-            rotateBtn.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            rotateBtn.bottomAnchor.constraint(equalTo: climbBtn.topAnchor, constant: -20),
+            rotateBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            rotateBtn.bottomAnchor.constraint(equalTo: climbBtn.topAnchor, constant: -10),
             rotateBtn.widthAnchor.constraint(equalToConstant: 70),
             rotateBtn.heightAnchor.constraint(equalToConstant: 70)
         ])
@@ -866,6 +883,16 @@ class GameViewController3D: UIViewController {
         rotateButton?.alpha = 0.5
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.rotateButton?.alpha = 1.0
+        }
+    }
+    
+    func hideOnScreenButtons() {
+        UIView.animate(withDuration: 0.3) { [weak self] in
+            self?.climbButton?.alpha = 0.0
+            self?.rotateButton?.alpha = 0.0
+        } completion: { [weak self] _ in
+            self?.climbButton?.isHidden = true
+            self?.rotateButton?.isHidden = true
         }
     }
     
