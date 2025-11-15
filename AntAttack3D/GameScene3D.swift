@@ -69,7 +69,7 @@ class GameScene3D: SCNScene {
     private let visibilityChangeThreshold = 5   // Need 5 consecutive frames to change state
     
     // Camera orbit state for searching when ball is hidden
-    private var cameraOrbitAngle: Float = 0.0   // Horizontal angle around ball (0-360 degrees)
+    var cameraOrbitAngle: Float = 0.0   // Horizontal angle around ball (0-360 degrees) - public for minimap rotation
     private var isSearchingForBall: Bool = false
     private var framesInCurrentOrbitPosition: Int = 0
     private let framesBeforeNextOrbit = 45      // Wait 0.75 seconds at each position (at 60fps) - slower for smoother movement with faster smoothing
@@ -927,14 +927,63 @@ class GameScene3D: SCNScene {
             print("🔍 DEBUG: Found \(candidatePositions.count) ground-level positions")
         }
         
-        // Spawn 3-5 hostages randomly from candidate positions
+        // Spawn 3-5 hostages with better distribution across the map
         // Number increases by 1 each level
         let numHostages = baseHostageCount + (currentLevel - 1)
         let actualNumHostages = min(candidatePositions.count, numHostages)
-        let shuffled = candidatePositions.shuffled()
         
-        for i in 0..<actualNumHostages {
-            let spawnPos = shuffled[i]
+        // Use a smarter selection algorithm to spread hostages across the map
+        // Instead of pure random, pick hostages that are far apart
+        var selectedPositions: [SCNVector3] = []
+        var remainingCandidates = candidatePositions
+        
+        // Pick first hostage randomly
+        if !remainingCandidates.isEmpty {
+            let firstIndex = Int.random(in: 0..<remainingCandidates.count)
+            selectedPositions.append(remainingCandidates[firstIndex])
+            remainingCandidates.remove(at: firstIndex)
+        }
+        
+        // Pick remaining hostages by maximizing minimum distance to already-selected hostages
+        let minDesiredDistance: Float = Float(cityMap.width) * 0.15  // 15% of map width
+        
+        while selectedPositions.count < actualNumHostages && !remainingCandidates.isEmpty {
+            // Find candidate that is furthest from all selected positions
+            var bestCandidate: SCNVector3?
+            var bestMinDistance: Float = 0
+            
+            for candidate in remainingCandidates {
+                // Calculate minimum distance to any already-selected hostage
+                var minDistToSelected: Float = Float.greatestFiniteMagnitude
+                for selected in selectedPositions {
+                    let dx = candidate.x - selected.x
+                    let dz = candidate.z - selected.z
+                    let dist = sqrt(dx*dx + dz*dz)
+                    minDistToSelected = min(minDistToSelected, dist)
+                }
+                
+                // Keep track of candidate with best (largest) minimum distance
+                if minDistToSelected > bestMinDistance {
+                    bestMinDistance = minDistToSelected
+                    bestCandidate = candidate
+                }
+            }
+            
+            // Add best candidate to selection
+            if let best = bestCandidate {
+                selectedPositions.append(best)
+                remainingCandidates.removeAll { pos in
+                    pos.x == best.x && pos.z == best.z
+                }
+            } else {
+                break  // No more candidates
+            }
+        }
+        
+        print("🎯 Selected \(selectedPositions.count) hostages with improved spacing (min distance: \(minDesiredDistance))")
+        
+        for i in 0..<selectedPositions.count {
+            let spawnPos = selectedPositions[i]
             let hostage = Hostage(position: spawnPos)
             rootNode.addChildNode(hostage.node)
             hostages.append(hostage)

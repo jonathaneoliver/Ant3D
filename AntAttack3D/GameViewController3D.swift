@@ -1,6 +1,8 @@
 import SceneKit
 import UIKit
 import GameController
+import CoreMotion
+import CoreMotion
 import os.log
 
 // Create logger for GameViewController3D
@@ -24,6 +26,14 @@ class GameViewController3D: UIViewController {
     var miniMapSafeMatIndicator: UIView?  // Blue square for safe mat area
     var axisView: SCNView!  // 3D axis indicator
     var controller: GCController?
+    
+    // Motion control properties
+    var motionManager: CMMotionManager?
+    var motionUpdateTimer: Timer?
+    var lastMotionX: Float = 0.0
+    var lastMotionZ: Float = 0.0
+    var climbButton: UIButton?
+    var rotateButton: UIButton?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -140,6 +150,11 @@ class GameViewController3D: UIViewController {
         // Setup Xbox controller
         setupGameController()
         updateDebugLabel("Controller setup complete")
+        
+        // Setup motion controls and on-screen buttons
+        setupMotionControls()
+        setupOnScreenButtons()
+        updateDebugLabel("Motion controls and buttons setup complete")
         
         // Start camera update loop
         startCameraUpdateLoop()
@@ -522,25 +537,39 @@ class GameViewController3D: UIViewController {
         let miniMapSize: CGFloat = 90
         let mapArea: CGFloat = miniMapSize - 12  // Leave space for borders
         
-        // Helper function to convert world position to mini-map coordinates
+        // Get camera angle for minimap rotation
+        let cameraAngle = gameScene.cameraOrbitAngle
+        let cameraRadians = CGFloat(cameraAngle * Float.pi / 180.0)  // Positive to match camera view
+        
+        // Helper function to convert world position to mini-map coordinates with rotation
         func worldToMiniMap(x: Float, z: Float) -> (CGFloat, CGFloat) {
+            // Normalize to 0-1 range
             let normalizedX = CGFloat(x / mapWidth)
             let normalizedZ = CGFloat(z / mapHeight)
-            let dotX = normalizedX * mapArea + 6
-            let dotY = normalizedZ * mapArea + 6  // No title, just border offset
+            
+            // Center coordinates (0.5, 0.5) is map center
+            let centeredX = normalizedX - 0.5
+            let centeredZ = normalizedZ - 0.5
+            
+            // Apply rotation around center
+            let rotatedX = centeredX * cos(cameraRadians) - centeredZ * sin(cameraRadians)
+            let rotatedZ = centeredX * sin(cameraRadians) + centeredZ * cos(cameraRadians)
+            
+            // Convert back to map coordinates with border offset
+            let dotX = (rotatedX + 0.5) * mapArea + 6
+            let dotY = (rotatedZ + 0.5) * mapArea + 6
             return (dotX, dotY)
         }
         
-        // Add safe mat indicator (blue square) - only create once
+        // Add safe mat indicator (blue square) - update position every frame for rotation
+        let safeMatPos = gameScene.safeMatPosition
+        let (matX, matY) = worldToMiniMap(x: safeMatPos.x, z: safeMatPos.z)
+        
+        // Size based on safe mat radius (6 units diameter = ~10% of map)
+        let matSize: CGFloat = 12  // Slightly larger than player dot
+        
         if miniMapSafeMatIndicator == nil {
-            let safeMatPos = gameScene.safeMatPosition
-            let (matX, matY) = worldToMiniMap(x: safeMatPos.x, z: safeMatPos.z)
-            
-            // Size based on safe mat radius (6 units diameter = ~10% of map)
-            let matSize: CGFloat = 12  // Slightly larger than player dot
-            
             let safeMatView = UIView()
-            safeMatView.frame = CGRect(x: matX - matSize/2, y: matY - matSize/2, width: matSize, height: matSize)
             safeMatView.backgroundColor = UIColor(red: 0.0, green: 0.3, blue: 1.0, alpha: 0.6)  // Bright blue matching 3D mat
             safeMatView.layer.cornerRadius = 2  // Slightly rounded square
             safeMatView.layer.borderWidth = 1
@@ -549,6 +578,9 @@ class GameViewController3D: UIViewController {
             miniMapView.addSubview(safeMatView)
             miniMapSafeMatIndicator = safeMatView
         }
+        
+        // Update safe mat position every frame to rotate with camera
+        miniMapSafeMatIndicator?.frame = CGRect(x: matX - matSize/2, y: matY - matSize/2, width: matSize, height: matSize)
         
         // Add blue dots for each unsaved hostage
         for hostage in gameScene.hostages where hostage.state != .saved {
@@ -726,6 +758,117 @@ class GameViewController3D: UIViewController {
         }
     }
     
+    // MARK: - Motion Controls
+    
+    func setupMotionControls() {
+        motionManager = CMMotionManager()
+        guard let motionManager = motionManager else { return }
+        
+        if motionManager.isAccelerometerAvailable {
+            motionManager.accelerometerUpdateInterval = 1.0 / 60.0  // 60 Hz
+            motionManager.startAccelerometerUpdates()
+            
+            // Use timer instead of handler to avoid threading issues
+            motionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+                self?.updateMotionControls()
+            }
+            
+            print("📱 Motion controls enabled")
+        } else {
+            print("📱 Accelerometer not available")
+        }
+    }
+    
+    func updateMotionControls() {
+        guard let motionManager = motionManager,
+              let data = motionManager.accelerometerData else { return }
+        
+        // In landscape orientation:
+        // - device.acceleration.x (pitch forward/back) controls Z axis (forward/back)
+        // - device.acceleration.y (roll left/right) controls X axis (left/right)
+        
+        // 10° tilt = 100% speed: sin(10°) ≈ 0.174
+        let sensitivity: Float = 1.0 / 0.174
+        
+        // Map accelerometer to movement (landscape mode) - INVERTED for correct direction
+        // Pitch (x) controls forward/back (Z), Roll (y) controls left/right (X)
+        let moveX = -Float(data.acceleration.y) * sensitivity  // Roll left/right (inverted)
+        let moveZ = -Float(data.acceleration.x) * sensitivity  // Pitch forward/back (inverted)
+        
+        // Clamp to -1...1
+        let clampedX = max(-1.0, min(1.0, moveX))
+        let clampedZ = max(-1.0, min(1.0, moveZ))
+        
+        // Store for physics update
+        lastMotionX = clampedX
+        lastMotionZ = clampedZ
+        
+        // Pass raw input - updateBallPhysics will handle camera rotation
+        gameScene.moveBall(x: clampedX, z: clampedZ)
+    }
+    
+    func setupOnScreenButtons() {
+        // Climb button (bottom-right, blue)
+        let climbBtn = UIButton(type: .system)
+        climbBtn.setTitle("🧗", for: .normal)
+        climbBtn.titleLabel?.font = UIFont.systemFont(ofSize: 40)
+        climbBtn.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.7)
+        climbBtn.layer.cornerRadius = 35
+        climbBtn.translatesAutoresizingMaskIntoConstraints = false
+        climbBtn.addTarget(self, action: #selector(climbButtonPressed), for: .touchDown)
+        climbBtn.addTarget(self, action: #selector(climbButtonReleased), for: [.touchUpInside, .touchUpOutside])
+        view.addSubview(climbBtn)
+        
+        // Camera rotate button (above climb button, green)
+        let rotateBtn = UIButton(type: .system)
+        rotateBtn.setTitle("🔄", for: .normal)
+        rotateBtn.titleLabel?.font = UIFont.systemFont(ofSize: 40)
+        rotateBtn.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.7)
+        rotateBtn.layer.cornerRadius = 35
+        rotateBtn.translatesAutoresizingMaskIntoConstraints = false
+        rotateBtn.addTarget(self, action: #selector(rotateButtonPressed), for: .touchUpInside)
+        view.addSubview(rotateBtn)
+        
+        NSLayoutConstraint.activate([
+            // Climb button - bottom right
+            climbBtn.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+            climbBtn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            climbBtn.widthAnchor.constraint(equalToConstant: 70),
+            climbBtn.heightAnchor.constraint(equalToConstant: 70),
+            
+            // Rotate button - above climb button
+            rotateBtn.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+            rotateBtn.bottomAnchor.constraint(equalTo: climbBtn.topAnchor, constant: -20),
+            rotateBtn.widthAnchor.constraint(equalToConstant: 70),
+            rotateBtn.heightAnchor.constraint(equalToConstant: 70)
+        ])
+        
+        climbButton = climbBtn
+        rotateButton = rotateBtn
+        
+        print("🎮 On-screen buttons created")
+    }
+    
+    @objc func climbButtonPressed() {
+        gameScene.jumpBall()
+        climbButton?.alpha = 0.5
+    }
+    
+    @objc func climbButtonReleased() {
+        gameScene.releaseJump()
+        climbButton?.alpha = 1.0
+    }
+    
+    @objc func rotateButtonPressed() {
+        gameScene.rotateCameraView()
+        
+        // Visual feedback
+        rotateButton?.alpha = 0.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.rotateButton?.alpha = 1.0
+        }
+    }
+    
     // MARK: - Camera Update Loop
     
     func startCameraUpdateLoop() {
@@ -747,10 +890,8 @@ class GameViewController3D: UIViewController {
         // Update mini-map (every frame to show real-time positions)
         updateMiniMap()
         
-        // Update ball movement from controller input (if connected)
-        if controller != nil {
-            gameScene.updateBallPhysics()
-        }
+        // Update ball movement from controller or motion input
+        gameScene.updateBallPhysics()
     }
     
     // MARK: - Game Over UI
