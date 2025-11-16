@@ -24,7 +24,13 @@
 
 
 		LS1234567890ABCDEF02 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = LS1234567890ABCDEF01 /* LaunchScreen.storyboard */; };
-/* End PBXBuildFile section */
+		9AFF243FA13644ADABBB0060 /* GameSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BA5AE5B70645AD8B25245F /* GameSystem.swift */; };
+		5B328E38AB2D48A6811D79E0 /* CameraSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14049DDA868A46C1A42E14DA /* CameraSystem.swift */; };
+		9DC8C5201340431C829C9993 /* PhysicsSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A6F5E3762248BB9038FD62 /* PhysicsSystem.swift */; };
+		89A60E1785E8419699FCE362 /* AISystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45D9330FF5C54B7C994D778D /* AISystem.swift */; };
+		D3539622C7824CBD9015AE77 /* GameStateSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DDF60B63FE041B09FC8A3E4 /* GameStateSystem.swift */; };
+		F5CEF05962F8454EBE433357 /* SpawnSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD9C284AE96C4C709D97F052 /* SpawnSystem.swift */; };
+		/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		085B4AB8003B465398DAB2EF /* GameScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScene3D.swift; sourceTree = "<group>"; };
@@ -48,7 +54,13 @@
 
 
 		LS1234567890ABCDEF01 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-/* End PBXFileReference section */
+		00BA5AE5B70645AD8B25245F /* GameSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSystem.swift; sourceTree = "<group>"; };
+		14049DDA868A46C1A42E14DA /* CameraSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraSystem.swift; sourceTree = "<group>"; };
+		C3A6F5E3762248BB9038FD62 /* PhysicsSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicsSystem.swift; sourceTree = "<group>"; };
+		45D9330FF5C54B7C994D778D /* AISystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISystem.swift; sourceTree = "<group>"; };
+		4DDF60B63FE041B09FC8A3E4 /* GameStateSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStateSystem.swift; sourceTree = "<group>"; };
+		BD9C284AE96C4C709D97F052 /* SpawnSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpawnSystem.swift; sourceTree = "<group>"; };
+		/* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		7954FF11007F4135908D5471 /* Frameworks */ = {
@@ -83,7 +95,8 @@
 				0C9D6469006E49198136897C /* Info.plist */,
 				323662323334303735633133 /* GKGameCenterConfiguration.plist */,
 			
-				LS1234567890ABCDEF01 /* LaunchScreen.storyboard */,);
+				LS1234567890ABCDEF01 /* LaunchScreen.storyboard */,				F87793B6719F464AAC5E9348 /* Systems */,
+);
 			path = AntAttack3D;
 			sourceTree = "<group>";
 		};
@@ -103,7 +116,21 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-/* End PBXGroup section */
+
+		F87793B6719F464AAC5E9348 /* Systems */ = {
+			isa = PBXGroup;
+			children = (
+				00BA5AE5B70645AD8B25245F /* GameSystem.swift */,
+				14049DDA868A46C1A42E14DA /* CameraSystem.swift */,
+				C3A6F5E3762248BB9038FD62 /* PhysicsSystem.swift */,
+				45D9330FF5C54B7C994D778D /* AISystem.swift */,
+				4DDF60B63FE041B09FC8A3E4 /* GameStateSystem.swift */,
+				BD9C284AE96C4C709D97F052 /* SpawnSystem.swift */,
+			);
+			path = Systems;
+			sourceTree = "<group>";
+			};
+	/* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
 		28C508D000C3433583C273E5 /* AntAttack3D */ = {
@@ -187,7 +214,13 @@
 				CF123456789ABCDEF0123456 /* ConfigManager.swift in Sources */,
 				EB123456789ABCDEF0123456 /* EnemyBall.swift in Sources */,
 				HO123456789ABCDEF0123456 /* Hostage.swift in Sources */,
-			);
+							9AFF243FA13644ADABBB0060 /* GameSystem.swift in Sources */,
+				5B328E38AB2D48A6811D79E0 /* CameraSystem.swift in Sources */,
+				9DC8C5201340431C829C9993 /* PhysicsSystem.swift in Sources */,
+				89A60E1785E8419699FCE362 /* AISystem.swift in Sources */,
+				D3539622C7824CBD9015AE77 /* GameStateSystem.swift in Sources */,
+				F5CEF05962F8454EBE433357 /* SpawnSystem.swift in Sources */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

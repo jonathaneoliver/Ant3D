@@ -911,20 +911,11 @@ class GameViewController3D: UIViewController {
     }
     
     @objc func updateCamera() {
-        // Update camera position to follow ball with config values
-        gameScene.updateCamera()
-        
-        // Update enemy AI
-        gameScene.updateEnemyAI()
-        
-        // Update hostage rescue system
-        gameScene.updateHostages()
+        // Update all game systems (camera, physics, AI, etc.)
+        gameScene.update(deltaTime: 1.0/60.0)  // Assume 60 FPS
         
         // Update mini-map (every frame to show real-time positions)
         updateMiniMap()
-        
-        // Update ball movement from controller or motion input
-        gameScene.updateBallPhysics()
     }
     
     // MARK: - Game Over UI
@@ -1090,8 +1081,8 @@ class GameViewController3D: UIViewController {
         gameScene.ballNode.physicsBody?.velocity = SCNVector3(0, 0, 0)
         gameScene.ballNode.physicsBody?.angularVelocity = SCNVector4(0, 0, 0, 0)
         
-        // Reset enemy positions to corners
-        gameScene.createEnemyBalls()
+        // Reset enemy positions to corners (delegated to SpawnSystem)
+        gameScene.spawnSystem.createEnemyBalls()
         
     }
     
