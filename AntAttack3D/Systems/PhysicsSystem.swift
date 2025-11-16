@@ -140,7 +140,8 @@ class PhysicsSystem: GameSystem {
             }
         }
         
-        // Apply movement
+        // Apply movement - only if there's input or we're in a special state
+        let hasMovementInput = abs(currentMoveX) > 0.01 || abs(currentMoveZ) > 0.01
         let shouldOverrideY = climbingWall || (isOnSlope && moveDirection.y != 0)
         
         if shouldOverrideY {
@@ -151,11 +152,12 @@ class PhysicsSystem: GameSystem {
                 z: moveDirection.z * speed * dampingFactor
             )
             physicsBody.velocity = newVelocity
-        } else {
-            // Normal movement - only set horizontal velocity
+        } else if hasMovementInput {
+            // Normal movement - only set horizontal velocity when there's input
             physicsBody.velocity.x = moveDirection.x * speed * dampingFactor
             physicsBody.velocity.z = moveDirection.z * speed * dampingFactor
         }
+        // If no input and not in special state, let physics (gravity) handle everything
         
         // Apply damping to downhill velocity
         if isOnSlope {

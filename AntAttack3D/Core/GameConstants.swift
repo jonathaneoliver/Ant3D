@@ -19,7 +19,7 @@ struct GameConstants {
     
     // MARK: - Physics
     struct Physics {
-        static let gravity: Float = -98.0               // Gravity acceleration (units/sec²) - strong gravity for fast falling
+        static let gravity: Float = -20.0               // Gravity acceleration (units/sec²)
         static let ballMass: Float = 1.0                // Mass of player/enemy/hostage balls
         static let ballRestitution: Float = 0.3         // Bounciness (0=no bounce, 1=perfect bounce)
         static let ballFriction: Float = 0.8            // Surface friction
