@@ -152,12 +152,13 @@ class PhysicsSystem: GameSystem {
                 z: moveDirection.z * speed * dampingFactor
             )
             physicsBody.velocity = newVelocity
-        } else if hasMovementInput && isGrounded {
-            // Normal movement - only set horizontal velocity when grounded and there's input
+        } else if hasMovementInput && (isGrounded || isJumping) {
+            // Normal movement - allow horizontal movement when grounded OR when jump button is held
+            // (Jump button allows repositioning while climbing, but without wall = no vertical climb)
             physicsBody.velocity.x = moveDirection.x * speed * dampingFactor
             physicsBody.velocity.z = moveDirection.z * speed * dampingFactor
         }
-        // If not grounded or no input, let physics (gravity) handle everything
+        // If not grounded, not jumping, and no input, let physics (gravity) handle everything
         
         // Apply damping to downhill velocity
         if isOnSlope {
