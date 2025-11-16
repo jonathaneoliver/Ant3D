@@ -1,6 +1,29 @@
 import GameKit
 import UIKit
 
+
+// Game Center error types for better error handling
+enum GameCenterError: LocalizedError {
+    case notAuthenticated
+    case leaderboardNotFound(String)
+    case submitFailed(Error)
+    case loadFailed(Error)
+    
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "Player is not authenticated with Game Center"
+        case .leaderboardNotFound(let id):
+            return "Leaderboard '\(id)' not found in App Store Connect"
+        case .submitFailed(let error):
+            return "Failed to submit score: \(error.localizedDescription)"
+        case .loadFailed(let error):
+            return "Failed to load leaderboard: \(error.localizedDescription)"
+        }
+    }
+}
+
+
 class GameCenterManager: NSObject {
     static let shared = GameCenterManager()
     

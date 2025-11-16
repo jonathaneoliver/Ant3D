@@ -40,6 +40,27 @@ struct RampData: Codable {
     var isShallow: Bool
 }
 
+// Network error types for better error handling
+enum NetworkError: LocalizedError {
+    case invalidURL(String)
+    case noData
+    case decodingFailed(Error)
+    case requestFailed(Error)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL(let url):
+            return "Invalid URL: \(url)"
+        case .noData:
+            return "No data received from server"
+        case .decodingFailed(let error):
+            return "Failed to decode response: \(error.localizedDescription)"
+        case .requestFailed(let error):
+            return "Network request failed: \(error.localizedDescription)"
+        }
+    }
+}
+
 // Configuration manager that polls the server
 class ConfigManager {
     static let shared = ConfigManager()
@@ -111,17 +132,21 @@ class ConfigManager {
     private func fetchConfig() {
         let urlString = serverURL
         guard let url = URL(string: urlString) else {
+            let error = NetworkError.invalidURL(urlString)
+            print("❌ ConfigManager: \(error.localizedDescription)")
             updateConnectionStatus(false)
             return
         }
         
         let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             if let error = error {
+                print("❌ ConfigManager: \(NetworkError.requestFailed(error).localizedDescription)")
                 self?.updateConnectionStatus(false)
                 return
             }
             
             guard let data = data else {
+                print("❌ ConfigManager: \(NetworkError.noData.localizedDescription)")
                 self?.updateConnectionStatus(false)
                 return
             }
@@ -142,6 +167,7 @@ class ConfigManager {
                     }
                 }
             } catch {
+                print("❌ ConfigManager: \(NetworkError.decodingFailed(error).localizedDescription)")
                 self?.updateConnectionStatus(false)
             }
         }
@@ -189,18 +215,24 @@ class ConfigManager {
     func fetchMapList(completion: @escaping (Result<[MapData], Error>) -> Void) {
         let urlString = "\(serverBaseURL)/api/maps"
         guard let url = URL(string: urlString) else {
-            completion(.failure(NSError(domain: "ConfigManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            let error = NetworkError.invalidURL(urlString)
+            print("❌ ConfigManager: \(error.localizedDescription)")
+            completion(.failure(error))
             return
         }
         
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
-                completion(.failure(error))
+                let networkError = NetworkError.requestFailed(error)
+                print("❌ ConfigManager: \(networkError.localizedDescription)")
+                completion(.failure(networkError))
                 return
             }
             
             guard let data = data else {
-                completion(.failure(NSError(domain: "ConfigManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                let error = NetworkError.noData
+                print("❌ ConfigManager: \(error.localizedDescription)")
+                completion(.failure(error))
                 return
             }
             
@@ -211,7 +243,9 @@ class ConfigManager {
                     completion(.success(maps))
                 }
             } catch {
-                completion(.failure(error))
+                let decodingError = NetworkError.decodingFailed(error)
+                print("❌ ConfigManager: \(decodingError.localizedDescription)")
+                completion(.failure(decodingError))
             }
         }
         
@@ -223,7 +257,9 @@ class ConfigManager {
         let encodedName = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
         let urlString = "\(serverBaseURL)/api/maps/\(encodedName)"
         guard let url = URL(string: urlString) else {
-            completion(.failure(NSError(domain: "ConfigManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            let error = NetworkError.invalidURL(urlString)
+            print("❌ ConfigManager: \(error.localizedDescription)")
+            completion(.failure(error))
             return
         }
         
@@ -231,13 +267,16 @@ class ConfigManager {
         
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
-                print("❌ Error loading map: \(error.localizedDescription)")
-                completion(.failure(error))
+                let networkError = NetworkError.requestFailed(error)
+                print("❌ ConfigManager: Error loading map '\(name)' - \(networkError.localizedDescription)")
+                completion(.failure(networkError))
                 return
             }
             
             guard let data = data else {
-                completion(.failure(NSError(domain: "ConfigManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                let error = NetworkError.noData
+                print("❌ ConfigManager: \(error.localizedDescription)")
+                completion(.failure(error))
                 return
             }
             
@@ -249,8 +288,9 @@ class ConfigManager {
                     completion(.success(mapData))
                 }
             } catch {
-                print("❌ Error decoding map: \(error.localizedDescription)")
-                completion(.failure(error))
+                let decodingError = NetworkError.decodingFailed(error)
+                print("❌ ConfigManager: Error decoding map '\(name)' - \(decodingError.localizedDescription)")
+                completion(.failure(decodingError))
             }
         }
         

@@ -2,7 +2,6 @@ import SceneKit
 import UIKit
 import GameController
 import CoreMotion
-import CoreMotion
 import os.log
 
 // Create logger for GameViewController3D
@@ -673,6 +672,10 @@ class GameViewController3D: UIViewController {
         return .landscape
     }
     
+    override var prefersHomeIndicatorAutoHidden: Bool {
+        return false  // Keep home indicator visible for easy iOS backgrounding
+    }
+    
     // MARK: - Xbox Controller Support
     
     func setupGameController() {
@@ -758,13 +761,16 @@ class GameViewController3D: UIViewController {
                 }
             }
             
-            // X button exits the game
+            // X button returns to title screen
             gamepad.buttonX.valueChangedHandler = { [weak self] (button, value, pressed) in
                 if pressed {
                     self?.controllerHasBeenUsed = true
                     self?.hideOnScreenButtons()
-                    print("👋 X button pressed - Exiting game")
-                    exit(0)
+                    print("👋 X button pressed - Returning to title screen")
+                    // Properly navigate back instead of forcing exit
+                    DispatchQueue.main.async {
+                        self?.navigationController?.popViewController(animated: true)
+                    }
                 }
             }
         }

@@ -7,6 +7,14 @@ DerivedData/
 # Build artifacts
 build/
 
+# Backup files
+*.bak
+*.backup
+*.landscape_backup
+*~
+*.swp
+*.swo
+
 # Node.js
 node_modules/
 npm-debug.log
