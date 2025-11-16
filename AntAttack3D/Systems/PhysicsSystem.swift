@@ -15,8 +15,12 @@ class PhysicsSystem: GameSystem {
     private var slopeNormal: SCNVector3 = SCNVector3(0, 1, 0)
     private var lastGroundCheckTime: TimeInterval = 0
     private var isGrounded: Bool = false
+    private var wasGrounded: Bool = false  // Track previous frame's grounded state
     private var normalRestitution: CGFloat = 0.3
     private var normalFriction: CGFloat = 0.8
+    
+    // MARK: - Climbing State Tracking
+    private var wasClimbingWall: Bool = false  // Track if we were climbing in previous frame
     
     init() {}
     
@@ -159,6 +163,24 @@ class PhysicsSystem: GameSystem {
             physicsBody.velocity.z = moveDirection.z * speed * dampingFactor
         }
         // If not grounded, not jumping, and no input, let physics (gravity) handle everything
+        
+        // OPTION 1: Auto-stop when reaching top of wall
+        // Detect transition from climbing to grounded (reached platform top)
+        if wasClimbingWall && !climbingWall && isGrounded && isJumping {
+            // Just reached the top of a climb - zero Y velocity to stick to platform
+            physicsBody.velocity.y = 0
+        }
+        
+        // OPTION 3: Apply landing damping when touching ground
+        // Helps ball "stick" to platforms instead of bouncing over
+        if !wasGrounded && isGrounded {
+            // Just landed - apply strong Y damping to grip the surface
+            physicsBody.velocity.y *= 0.3
+        }
+        
+        // Update state tracking for next frame
+        wasGrounded = isGrounded
+        wasClimbingWall = climbingWall
         
         // Apply damping to downhill velocity
         if isOnSlope {
