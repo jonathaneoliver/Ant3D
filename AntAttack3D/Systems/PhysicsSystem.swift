@@ -152,12 +152,12 @@ class PhysicsSystem: GameSystem {
                 z: moveDirection.z * speed * dampingFactor
             )
             physicsBody.velocity = newVelocity
-        } else if hasMovementInput {
-            // Normal movement - only set horizontal velocity when there's input
+        } else if hasMovementInput && isGrounded {
+            // Normal movement - only set horizontal velocity when grounded and there's input
             physicsBody.velocity.x = moveDirection.x * speed * dampingFactor
             physicsBody.velocity.z = moveDirection.z * speed * dampingFactor
         }
-        // If no input and not in special state, let physics (gravity) handle everything
+        // If not grounded or no input, let physics (gravity) handle everything
         
         // Apply damping to downhill velocity
         if isOnSlope {
