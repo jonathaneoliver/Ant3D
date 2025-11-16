@@ -1,7 +1,5 @@
 import SceneKit
 import UIKit
-import GameController
-import CoreMotion
 import os.log
 
 // Create logger for GameViewController3D
@@ -24,16 +22,13 @@ class GameViewController3D: UIViewController {
     var miniMapPlayerDot: UIView?  // Red dot for player position
     var miniMapSafeMatIndicator: UIView?  // Blue square for safe mat area
     var axisView: SCNView!  // 3D axis indicator
-    var controller: GCController?
     
-    // Motion control properties
-    var motionManager: CMMotionManager?
-    var motionUpdateTimer: Timer?
-    var lastMotionX: Float = 0.0
-    var lastMotionZ: Float = 0.0
-    var climbButton: UIButton?
-    var rotateButton: UIButton?
-    var controllerHasBeenUsed: Bool = false  // Track if controller input has been detected
+    // Input management
+    var inputManager: InputManager!
+    
+    deinit {
+        inputManager?.cleanup()
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -147,14 +142,24 @@ class GameViewController3D: UIViewController {
         // Setup game over callback
         setupGameOverCallback()
         
-        // Setup Xbox controller
-        setupGameController()
-        updateDebugLabel("Controller setup complete")
-        
-        // Setup motion controls and on-screen buttons
-        setupMotionControls()
-        setupOnScreenButtons()
-        updateDebugLabel("Motion controls and buttons setup complete")
+        // Setup input manager (controller, motion, on-screen buttons)
+        inputManager = InputManager()
+        inputManager.gameScene = gameScene
+        inputManager.viewController = self
+        inputManager.onCameraRotate = { [weak self] in
+            // Visual feedback for rotate button (if visible)
+            self?.inputManager.rotateButton?.alpha = 0.5
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self?.inputManager.rotateButton?.alpha = 1.0
+            }
+        }
+        inputManager.onReturnToTitle = { [weak self] in
+            DispatchQueue.main.async {
+                self?.navigationController?.popViewController(animated: true)
+            }
+        }
+        inputManager.setup()
+        updateDebugLabel("Input manager setup complete")
         
         // Start camera update loop
         startCameraUpdateLoop()
@@ -643,20 +648,6 @@ class GameViewController3D: UIViewController {
         super.viewDidAppear(animated)
         print("🎮 GameViewController viewDidAppear - becoming first responder")
         becomeFirstResponder()
-        
-        // Re-check for controllers when view appears (in case we missed it during init)
-        print("🎮 Re-checking for controllers in viewDidAppear...")
-        print("🎮 Number of controllers: \(GCController.controllers().count)")
-        if controller == nil && !GCController.controllers().isEmpty {
-            print("🎮 ⚠️ Controller was nil but controllers are available - reconnecting...")
-            if let gameController = GCController.controllers().first {
-                connectController(gameController)
-            }
-        } else if controller != nil {
-            print("🎮 ✅ Controller already connected: \(controller?.vendorName ?? "Unknown")")
-        } else {
-            print("🎮 ❌ No controllers available")
-        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -674,232 +665,6 @@ class GameViewController3D: UIViewController {
     
     override var prefersHomeIndicatorAutoHidden: Bool {
         return false  // Keep home indicator visible for easy iOS backgrounding
-    }
-    
-    // MARK: - Xbox Controller Support
-    
-    func setupGameController() {
-        print("🎮 setupGameController() called")
-        
-        // Watch for controller connections
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(controllerDidConnect),
-            name: .GCControllerDidConnect,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(controllerDidDisconnect),
-            name: .GCControllerDidDisconnect,
-            object: nil
-        )
-        
-        // Check if controller already connected
-        print("🎮 Checking for connected controllers...")
-        print("🎮 Number of controllers: \(GCController.controllers().count)")
-        if let controller = GCController.controllers().first {
-            print("🎮 ✅ Controller found: \(controller.vendorName ?? "Unknown")")
-            connectController(controller)
-        } else {
-            print("🎮 ❌ No controller connected")
-        }
-    }
-    
-    @objc func controllerDidConnect(_ notification: Notification) {
-        print("🎮 Controller CONNECTED notification received!")
-        if let controller = notification.object as? GCController {
-            print("🎮 Controller: \(controller.vendorName ?? "Unknown")")
-            connectController(controller)
-        }
-    }
-    
-    @objc func controllerDidDisconnect(_ notification: Notification) {
-        print("🎮 Controller DISCONNECTED!")
-        controller = nil
-    }
-    
-    func connectController(_ controller: GCController) {
-        print("🎮 connectController() called for: \(controller.vendorName ?? "Unknown")")
-        self.controller = controller
-        
-        // Handle extended gamepad (Xbox, PlayStation, etc.)
-        if let gamepad = controller.extendedGamepad {
-            print("🎮 ✅ Extended gamepad found - setting up handlers")
-            
-            // Left stick for ball movement
-            gamepad.leftThumbstick.valueChangedHandler = { [weak self] (stick, xValue, yValue) in
-                // Mark controller as used when any significant input detected
-                if abs(xValue) > 0.1 || abs(yValue) > 0.1 {
-                    self?.controllerHasBeenUsed = true
-                    self?.hideOnScreenButtons()
-                }
-                // Y is inverted on game controllers
-                print("🕹️ Left stick: x=\(xValue), y=\(yValue)")
-                self?.gameScene.moveBall(x: xValue, z: -yValue)
-            }
-            
-            // A button for wall climbing (hold to climb)
-            gamepad.buttonA.valueChangedHandler = { [weak self] (button, value, pressed) in
-                self?.controllerHasBeenUsed = true
-                self?.hideOnScreenButtons()
-                if pressed {
-                    self?.gameScene.jumpBall()
-                } else {
-                    self?.gameScene.releaseJump()
-                }
-            }
-            
-            // Optional: Right stick for camera rotation (if you want to add that later)
-            // B button rotates camera view by 45 degrees
-            gamepad.buttonB.valueChangedHandler = { [weak self] (button, value, pressed) in
-                if pressed {
-                    self?.controllerHasBeenUsed = true
-                    self?.hideOnScreenButtons()
-                    self?.gameScene.rotateCameraView()
-                }
-            }
-            
-            // X button returns to title screen
-            gamepad.buttonX.valueChangedHandler = { [weak self] (button, value, pressed) in
-                if pressed {
-                    self?.controllerHasBeenUsed = true
-                    self?.hideOnScreenButtons()
-                    print("👋 X button pressed - Returning to title screen")
-                    // Properly navigate back instead of forcing exit
-                    DispatchQueue.main.async {
-                        self?.navigationController?.popViewController(animated: true)
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Motion Controls
-    
-    func setupMotionControls() {
-        motionManager = CMMotionManager()
-        guard let motionManager = motionManager else { return }
-        
-        if motionManager.isAccelerometerAvailable {
-            motionManager.accelerometerUpdateInterval = 1.0 / 60.0  // 60 Hz
-            motionManager.startAccelerometerUpdates()
-            
-            // Use timer instead of handler to avoid threading issues
-            motionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
-                self?.updateMotionControls()
-            }
-            
-            print("📱 Motion controls enabled")
-        } else {
-            print("📱 Accelerometer not available")
-        }
-    }
-    
-    func updateMotionControls() {
-        // Don't use motion controls if a game controller has been actively used
-        if controllerHasBeenUsed {
-            return
-        }
-        
-        guard let motionManager = motionManager,
-              let data = motionManager.accelerometerData else { return }
-        
-        // In landscape orientation:
-        // - device.acceleration.x (pitch forward/back) controls Z axis (forward/back)
-        // - device.acceleration.y (roll left/right) controls X axis (left/right)
-        
-        // 10° tilt = 100% speed: sin(10°) ≈ 0.174
-        let sensitivity: Float = 1.0 / 0.174
-        
-        // Map accelerometer to movement (landscape mode) - INVERTED for correct direction
-        // Pitch (x) controls forward/back (Z), Roll (y) controls left/right (X)
-        let moveX = -Float(data.acceleration.y) * sensitivity  // Roll left/right (inverted)
-        let moveZ = -Float(data.acceleration.x) * sensitivity  // Pitch forward/back (inverted)
-        
-        // Clamp to -1...1
-        let clampedX = max(-1.0, min(1.0, moveX))
-        let clampedZ = max(-1.0, min(1.0, moveZ))
-        
-        // Store for physics update
-        lastMotionX = clampedX
-        lastMotionZ = clampedZ
-        
-        // Pass raw input - updateBallPhysics will handle camera rotation
-        gameScene.moveBall(x: clampedX, z: clampedZ)
-    }
-    
-    func setupOnScreenButtons() {
-        // Climb button (bottom-right, blue)
-        let climbBtn = UIButton(type: .system)
-        climbBtn.setTitle("🧗", for: .normal)
-        climbBtn.titleLabel?.font = UIFont.systemFont(ofSize: 40)
-        climbBtn.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.7)
-        climbBtn.layer.cornerRadius = 35
-        climbBtn.translatesAutoresizingMaskIntoConstraints = false
-        climbBtn.addTarget(self, action: #selector(climbButtonPressed), for: .touchDown)
-        climbBtn.addTarget(self, action: #selector(climbButtonReleased), for: [.touchUpInside, .touchUpOutside])
-        view.addSubview(climbBtn)
-        
-        // Camera rotate button (above climb button, green)
-        let rotateBtn = UIButton(type: .system)
-        rotateBtn.setTitle("🔄", for: .normal)
-        rotateBtn.titleLabel?.font = UIFont.systemFont(ofSize: 40)
-        rotateBtn.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.7)
-        rotateBtn.layer.cornerRadius = 35
-        rotateBtn.translatesAutoresizingMaskIntoConstraints = false
-        rotateBtn.addTarget(self, action: #selector(rotateButtonPressed), for: .touchUpInside)
-        view.addSubview(rotateBtn)
-        
-        NSLayoutConstraint.activate([
-            // Climb button - absolute bottom right corner
-            climbBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            climbBtn.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
-            climbBtn.widthAnchor.constraint(equalToConstant: 70),
-            climbBtn.heightAnchor.constraint(equalToConstant: 70),
-            
-            // Rotate button - above climb button
-            rotateBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            rotateBtn.bottomAnchor.constraint(equalTo: climbBtn.topAnchor, constant: -10),
-            rotateBtn.widthAnchor.constraint(equalToConstant: 70),
-            rotateBtn.heightAnchor.constraint(equalToConstant: 70)
-        ])
-        
-        climbButton = climbBtn
-        rotateButton = rotateBtn
-        
-        print("🎮 On-screen buttons created")
-    }
-    
-    @objc func climbButtonPressed() {
-        gameScene.jumpBall()
-        climbButton?.alpha = 0.5
-    }
-    
-    @objc func climbButtonReleased() {
-        gameScene.releaseJump()
-        climbButton?.alpha = 1.0
-    }
-    
-    @objc func rotateButtonPressed() {
-        gameScene.rotateCameraView()
-        
-        // Visual feedback
-        rotateButton?.alpha = 0.5
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.rotateButton?.alpha = 1.0
-        }
-    }
-    
-    func hideOnScreenButtons() {
-        UIView.animate(withDuration: 0.3) { [weak self] in
-            self?.climbButton?.alpha = 0.0
-            self?.rotateButton?.alpha = 0.0
-        } completion: { [weak self] _ in
-            self?.climbButton?.isHidden = true
-            self?.rotateButton?.isHidden = true
-        }
     }
     
     // MARK: - Camera Update Loop

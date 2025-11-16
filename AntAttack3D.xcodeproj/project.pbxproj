@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C6FF39D58FE54BFDBD37DCA6 /* InputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */; };
+		F70A464B3CD048E3BE34FDE3 /* InputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B26DC3BE2442DCADB9253D /* InputManager.swift */; };
 		085B4AB8003B465398DAB2F0 /* GameScene3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = 085B4AB8003B465398DAB2EF /* GameScene3D.swift */; };
 		FD2EB4EF814B4723BC4494C7 /* GameConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF9487F65354EF29BE76814 /* GameConstants.swift */; };
 		0CB7AF872EC798C200388210 /* LeaderboardScene3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB7AF842EC798C200388210 /* LeaderboardScene3D.swift */; };
@@ -33,6 +35,8 @@
 		/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProvider.swift; sourceTree = "<group>"; };
+		79B26DC3BE2442DCADB9253D /* InputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputManager.swift; sourceTree = "<group>"; };
 		085B4AB8003B465398DAB2EF /* GameScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScene3D.swift; sourceTree = "<group>"; };
 		BAF9487F65354EF29BE76814 /* GameConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/GameConstants.swift; sourceTree = "<group>"; };
 		0C9D6469006E49198136897C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -73,7 +77,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		1C40C39400A1428E8B1D02F9 /* AntAttack3D */ = {
+
+		54B30E44DEA444479187AF16 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */,
+				79B26DC3BE2442DCADB9253D /* InputManager.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};		1C40C39400A1428E8B1D02F9 /* AntAttack3D */ = {
 			isa = PBXGroup;
 			children = (
 				0CB7AF8D2EC79DF900388210 /* AntAttack3D.entitlements */,
@@ -96,6 +109,7 @@
 				323662323334303735633133 /* GKGameCenterConfiguration.plist */,
 			
 				LS1234567890ABCDEF01 /* LaunchScreen.storyboard */,				F87793B6719F464AAC5E9348 /* Systems */,
+				54B30E44DEA444479187AF16 /* Input */,
 );
 			path = AntAttack3D;
 			sourceTree = "<group>";
@@ -220,6 +234,8 @@
 				89A60E1785E8419699FCE362 /* AISystem.swift in Sources */,
 				D3539622C7824CBD9015AE77 /* GameStateSystem.swift in Sources */,
 				F5CEF05962F8454EBE433357 /* SpawnSystem.swift in Sources */,
+				C6FF39D58FE54BFDBD37DCA6 /* InputProvider.swift in Sources */,
+				F70A464B3CD048E3BE34FDE3 /* InputManager.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
