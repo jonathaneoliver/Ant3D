@@ -26,16 +26,16 @@ class EnemyBall {
     var wanderTimer: TimeInterval = 0
     
     // AI configuration
-    var sightDistance: Float = 20.0     // How far enemy can see
-    var speedMultiplier: Float = 0.75   // 75% of player speed
-    var searchTimeout: TimeInterval = 5.0  // How long to search before wandering
+    var sightDistance: Float = GameConstants.Enemy.sightDistance
+    var speedMultiplier: Float = GameConstants.Enemy.speedMultiplier
+    var searchTimeout: TimeInterval = GameConstants.Enemy.searchTimeout
     
     // Movement parameters
-    private let baseSpeed: Float = 8.0  // Base movement speed (matches player)
+    private let baseSpeed: Float = GameConstants.Enemy.baseSpeed
     
     init(position: SCNVector3) {
         // Create sphere geometry (same size as player ball)
-        let sphere = SCNSphere(radius: 0.5)
+        let sphere = SCNSphere(radius: CGFloat(GameConstants.Collision.enemyRadius))
         
         // Gray material for enemy (default wander state)
         let material = SCNMaterial()
@@ -277,13 +277,13 @@ class EnemyBall {
             let length = sqrt(awayDirection.x * awayDirection.x + awayDirection.z * awayDirection.z)
             if length > 0.1 {
                 // Pick a new wander target in the opposite direction from other enemies
-                let distance: Float = 8.0  // Go farther when avoiding others
+                let distance: Float = GameConstants.Enemy.avoidanceDistance  // Go farther when avoiding others
                 wanderTarget = SCNVector3(
                     x: currentPosition.x + (awayDirection.x / length) * distance,
                     y: currentPosition.y,
                     z: currentPosition.z + (awayDirection.z / length) * distance
                 )
-                wanderTimer = 3.0
+                wanderTimer = GameConstants.Enemy.wanderInterval
             }
         } else {
             // Normal wandering - no enemies visible
@@ -293,13 +293,13 @@ class EnemyBall {
             if wanderTimer <= 0 || wanderTarget == nil {
                 // Random direction
                 let angle = Float.random(in: 0...(2 * Float.pi))
-                let distance: Float = 5.0
+                let distance: Float = GameConstants.Enemy.wanderTargetDistance
                 wanderTarget = SCNVector3(
                     x: currentPosition.x + cos(angle) * distance,
                     y: currentPosition.y,
                     z: currentPosition.z + sin(angle) * distance
                 )
-                wanderTimer = 3.0
+                wanderTimer = GameConstants.Enemy.wanderInterval
             }
         }
         

@@ -509,7 +509,7 @@ class GameViewController3D: UIViewController {
         miniMapView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
         miniMapView.layer.cornerRadius = 6
         miniMapView.layer.masksToBounds = true
-        miniMapView.layer.borderWidth = 2
+        miniMapView.layer.borderWidth = GameConstants.UI.buttonBorderWidth
         miniMapView.layer.borderColor = UIColor.cyan.cgColor
         miniMapView.isUserInteractionEnabled = false  // Don't block controller input!
         

@@ -16,7 +16,7 @@ class CityMap3D {
     
     let width: Int
     let height: Int
-    let maxLevels: Int = 6  // Increased for taller structures
+    let maxLevels: Int = GameConstants.Map.maxLevels
     
     // 3D grid: [x][y][z] = true if block exists
     var blocks: [[[Bool]]]
@@ -24,7 +24,7 @@ class CityMap3D {
     // List of ramps (diagonal blocks)
     var ramps: [Ramp] = []
     
-    init(width: Int = 60, height: Int = 60, useAntAttackMap: Bool = true) {  // Larger map with more room for structures
+    init(width: Int = GameConstants.Map.defaultWidth, height: Int = GameConstants.Map.defaultHeight, useAntAttackMap: Bool = true) {  // Larger map with more room for structures
         self.width = width
         self.height = height
         

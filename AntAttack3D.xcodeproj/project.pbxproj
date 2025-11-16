@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		085B4AB8003B465398DAB2F0 /* GameScene3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = 085B4AB8003B465398DAB2EF /* GameScene3D.swift */; };
+		FD2EB4EF814B4723BC4494C7 /* GameConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF9487F65354EF29BE76814 /* GameConstants.swift */; };
 		0CB7AF872EC798C200388210 /* LeaderboardScene3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB7AF842EC798C200388210 /* LeaderboardScene3D.swift */; };
 		0CB7AF882EC798C200388210 /* MainNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB7AF852EC798C200388210 /* MainNavigationController.swift */; };
 		0CB7AF892EC798C200388210 /* TitleScene3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB7AF862EC798C200388210 /* TitleScene3D.swift */; };
@@ -27,6 +28,7 @@
 
 /* Begin PBXFileReference section */
 		085B4AB8003B465398DAB2EF /* GameScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScene3D.swift; sourceTree = "<group>"; };
+		BAF9487F65354EF29BE76814 /* GameConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/GameConstants.swift; sourceTree = "<group>"; };
 		0C9D6469006E49198136897C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0CB7AF822EC798C200388210 /* AboutScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutScene3D.swift; sourceTree = "<group>"; };
 		0CB7AF832EC798C200388210 /* GameCenterManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCenterManager.swift; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 				7038269C001F40A19E912B71 /* AppDelegate3D.swift */,
 				9B3C8709002A41139AE80305 /* GameViewController3D.swift */,
 				085B4AB8003B465398DAB2EF /* GameScene3D.swift */,
+				BAF9487F65354EF29BE76814 /* GameConstants.swift */,
 				D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */,
 				CF123456789ABCDEF0123455 /* ConfigManager.swift */,
 				EB123456789ABCDEF0123455 /* EnemyBall.swift */,
@@ -179,6 +182,7 @@
 				7038269C001F40A19E912B72 /* AppDelegate3D.swift in Sources */,
 				9B3C8709002A41139AE80306 /* GameViewController3D.swift in Sources */,
 				085B4AB8003B465398DAB2F0 /* GameScene3D.swift in Sources */,
+				FD2EB4EF814B4723BC4494C7 /* GameConstants.swift in Sources */,
 				D9E9730A004C4AACA7FB2D40 /* CityMap3D.swift in Sources */,
 				CF123456789ABCDEF0123456 /* ConfigManager.swift in Sources */,
 				EB123456789ABCDEF0123456 /* EnemyBall.swift in Sources */,

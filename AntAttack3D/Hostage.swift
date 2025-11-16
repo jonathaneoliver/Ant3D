@@ -21,13 +21,13 @@ class Hostage {
     }
     
     // Follow behavior parameters
-    private let followDistance: Float = 2.0  // Stay 2 units behind player
-    private let followSpeed: Float = 9.0     // Slightly faster than player to catch up
+    private let followDistance: Float = GameConstants.Hostage.followDistance
+    private let followSpeed: Float = GameConstants.Hostage.followSpeed
     private var targetPosition: SCNVector3?  // Where to move toward
     
     init(position: SCNVector3) {
         // Create sphere geometry (same size as player ball)
-        let sphere = SCNSphere(radius: 0.5)
+        let sphere = SCNSphere(radius: CGFloat(GameConstants.Collision.hostageRadius))
         
         // Blue material for hostage
         let material = SCNMaterial()
@@ -42,13 +42,13 @@ class Hostage {
         node.position = position
         
         // Add physics body (dynamic by default so hostages fall onto blocks)
-        let physicsBody = SCNPhysicsBody(type: .dynamic, shape: SCNPhysicsShape(geometry: sphere))
-        physicsBody.mass = 1.0
-        physicsBody.restitution = 0.3
-        physicsBody.friction = 0.8
-        physicsBody.rollingFriction = 0.3
-        physicsBody.damping = 0.1
-        physicsBody.angularDamping = 0.1
+        let physicsBody = SCNPhysicsBody(type: .dynamic, shape: SCNPhysicsShape(geometry: sphere))  // Using GameConstants for physics
+        physicsBody.mass = CGFloat(GameConstants.Physics.ballMass)
+        physicsBody.restitution = CGFloat(GameConstants.Physics.ballRestitution)
+        physicsBody.friction = CGFloat(GameConstants.Physics.ballFriction)
+        physicsBody.rollingFriction = CGFloat(GameConstants.Physics.rollingFriction)
+        physicsBody.damping = CGFloat(GameConstants.Physics.damping)
+        physicsBody.angularDamping = CGFloat(GameConstants.Physics.angularDamping)
         
         node.physicsBody = physicsBody
     }
