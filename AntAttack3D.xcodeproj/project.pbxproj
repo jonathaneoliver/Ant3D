@@ -37,24 +37,24 @@
 /* Begin PBXFileReference section */
 		D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProvider.swift; sourceTree = "<group>"; };
 		79B26DC3BE2442DCADB9253D /* InputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputManager.swift; sourceTree = "<group>"; };
-		085B4AB8003B465398DAB2EF /* GameScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScene3D.swift; sourceTree = "<group>"; };
+		085B4AB8003B465398DAB2EF /* GameScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scenes/GameScene3D.swift; sourceTree = "<group>"; };
 		BAF9487F65354EF29BE76814 /* GameConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/GameConstants.swift; sourceTree = "<group>"; };
 		0C9D6469006E49198136897C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		0CB7AF822EC798C200388210 /* AboutScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutScene3D.swift; sourceTree = "<group>"; };
-		0CB7AF832EC798C200388210 /* GameCenterManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCenterManager.swift; sourceTree = "<group>"; };
-		0CB7AF842EC798C200388210 /* LeaderboardScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardScene3D.swift; sourceTree = "<group>"; };
-		0CB7AF852EC798C200388210 /* MainNavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainNavigationController.swift; sourceTree = "<group>"; };
-		0CB7AF862EC798C200388210 /* TitleScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitleScene3D.swift; sourceTree = "<group>"; };
+		0CB7AF822EC798C200388210 /* AboutScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scenes/AboutScene3D.swift; sourceTree = "<group>"; };
+		0CB7AF832EC798C200388210 /* GameCenterManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/GameCenterManager.swift; sourceTree = "<group>"; };
+		0CB7AF842EC798C200388210 /* LeaderboardScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scenes/LeaderboardScene3D.swift; sourceTree = "<group>"; };
+		0CB7AF852EC798C200388210 /* MainNavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MainNavigationController.swift; sourceTree = "<group>"; };
+		0CB7AF862EC798C200388210 /* TitleScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scenes/TitleScene3D.swift; sourceTree = "<group>"; };
 		0CB7AF8C2EC79DD900388210 /* AntAttack3DDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AntAttack3DDebug.entitlements; sourceTree = "<group>"; };
 		0CB7AF8D2EC79DF900388210 /* AntAttack3D.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AntAttack3D.entitlements; sourceTree = "<group>"; };
 		5E869283MAIN4E68B12A3C8B /* AntAttack3D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AntAttack3D.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		7038269C001F40A19E912B71 /* AppDelegate3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate3D.swift; sourceTree = "<group>"; };
-		9B3C8709002A41139AE80305 /* GameViewController3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewController3D.swift; sourceTree = "<group>"; };
+		7038269C001F40A19E912B71 /* AppDelegate3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegate3D.swift; sourceTree = "<group>"; };
+		9B3C8709002A41139AE80305 /* GameViewController3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewControllers/GameViewController3D.swift; sourceTree = "<group>"; };
 		AA123456789ABCDEF0123455 /* ant_attack_original.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ant_attack_original.json; sourceTree = "<group>"; };
-		CF123456789ABCDEF0123455 /* ConfigManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigManager.swift; sourceTree = "<group>"; };
-		D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityMap3D.swift; sourceTree = "<group>"; };
-		EB123456789ABCDEF0123455 /* EnemyBall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnemyBall.swift; sourceTree = "<group>"; };
-		HO123456789ABCDEF0123455 /* Hostage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hostage.swift; sourceTree = "<group>"; };		323662323334303735633133 /* GKGameCenterConfiguration.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = GKGameCenterConfiguration.plist; sourceTree = "<group>"; };
+		CF123456789ABCDEF0123455 /* ConfigManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ConfigManager.swift; sourceTree = "<group>"; };
+		D9E9730A004C4AACA7FB2D3F /* CityMap3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World/CityMap3D.swift; sourceTree = "<group>"; };
+		EB123456789ABCDEF0123455 /* EnemyBall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entities/EnemyBall.swift; sourceTree = "<group>"; };
+		HO123456789ABCDEF0123455 /* Hostage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entities/Hostage.swift; sourceTree = "<group>"; };		323662323334303735633133 /* GKGameCenterConfiguration.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = GKGameCenterConfiguration.plist; sourceTree = "<group>"; };
 
 
 		LS1234567890ABCDEF01 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
