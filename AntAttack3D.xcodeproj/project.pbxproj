@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8247A2FE17CC49F8913C081D /* HUDManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E1235A722943B38F02031F /* HUDManager.swift */; };
 		C6FF39D58FE54BFDBD37DCA6 /* InputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */; };
 		F70A464B3CD048E3BE34FDE3 /* InputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B26DC3BE2442DCADB9253D /* InputManager.swift */; };
 		085B4AB8003B465398DAB2F0 /* GameScene3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = 085B4AB8003B465398DAB2EF /* GameScene3D.swift */; };
@@ -35,6 +36,7 @@
 		/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		72E1235A722943B38F02031F /* HUDManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDManager.swift; sourceTree = "<group>"; };
 		D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProvider.swift; sourceTree = "<group>"; };
 		79B26DC3BE2442DCADB9253D /* InputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputManager.swift; sourceTree = "<group>"; };
 		085B4AB8003B465398DAB2EF /* GameScene3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scenes/GameScene3D.swift; sourceTree = "<group>"; };
@@ -78,6 +80,14 @@
 
 /* Begin PBXGroup section */
 
+		D5130C81A8C44DC7B6B05230 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				72E1235A722943B38F02031F /* HUDManager.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
 		54B30E44DEA444479187AF16 /* Input */ = {
 			isa = PBXGroup;
 			children = (
@@ -110,6 +120,7 @@
 			
 				LS1234567890ABCDEF01 /* LaunchScreen.storyboard */,				F87793B6719F464AAC5E9348 /* Systems */,
 				54B30E44DEA444479187AF16 /* Input */,
+				D5130C81A8C44DC7B6B05230 /* UI */,
 );
 			path = AntAttack3D;
 			sourceTree = "<group>";
@@ -236,6 +247,7 @@
 				F5CEF05962F8454EBE433357 /* SpawnSystem.swift in Sources */,
 				C6FF39D58FE54BFDBD37DCA6 /* InputProvider.swift in Sources */,
 				F70A464B3CD048E3BE34FDE3 /* InputManager.swift in Sources */,
+				8247A2FE17CC49F8913C081D /* HUDManager.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
