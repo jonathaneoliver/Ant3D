@@ -29,13 +29,6 @@ class GameViewController3D: UIViewController {
         NSLog("🎮 GameViewController viewDidLoad started")
         os_log("🎮 GameViewController viewDidLoad started", type: .error)
         
-        // Setup HUD manager first (includes debug label)
-        hudManager = HUDManager()
-        hudManager.view = view
-        hudManager.gameScene = gameScene
-        hudManager.setup()
-        hudManager.updateDebugLabel("viewDidLoad started")
-        
         FileLogger.shared.log("✅ Creating SceneView")
         
         // Create SceneView with Auto Layout to ensure edge-to-edge positioning
@@ -53,7 +46,6 @@ class GameViewController3D: UIViewController {
         
         NSLog("✅ SceneView created and added to view")
         FileLogger.shared.log("✅ SceneView created")
-        hudManager.updateDebugLabel("SceneView created")
         
         // Create the game scene
         gameScene = GameScene3D()
@@ -62,8 +54,6 @@ class GameViewController3D: UIViewController {
         
         NSLog("✅ GameScene created and set")
         FileLogger.shared.log("✅ GameScene created")
-        hudManager.updateDebugLabel("GameScene created")
-        hudManager.gameScene = gameScene  // Update HUD manager's game scene reference
         
         // Configure the view
         sceneView.backgroundColor = UIColor(red: 0.59, green: 0.85, blue: 0.93, alpha: 1.0)
@@ -74,6 +64,11 @@ class GameViewController3D: UIViewController {
         // Optional: Add antialiasing for smoother edges
         sceneView.antialiasingMode = .multisampling4X
         
+        // Setup HUD manager AFTER sceneView is created (so HUD elements appear on top)
+        hudManager = HUDManager()
+        hudManager.view = view
+        hudManager.gameScene = gameScene
+        hudManager.setup()
         hudManager.updateDebugLabel("HUD setup complete")
         
         // Start configuration server polling
