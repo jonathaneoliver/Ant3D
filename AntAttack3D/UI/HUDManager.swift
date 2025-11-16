@@ -13,7 +13,6 @@ class HUDManager {
     weak var gameScene: GameScene3D?
     
     // HUD Elements
-    private var debugLabel: UILabel!
     private var connectionStatusLabel: UILabel!
     private var visibilityLabel: UILabel!
     private var distanceLabel: UILabel!
@@ -38,7 +37,6 @@ class HUDManager {
     func setup() {
         guard view != nil else { return }
         
-        setupBigDebugLabel()
         setupConnectionStatusHUD()
         setupVisibilityHUD()
         setupDistanceHUD()
@@ -52,7 +50,6 @@ class HUDManager {
     }
     
     func cleanup() {
-        debugLabel?.removeFromSuperview()
         connectionStatusLabel?.removeFromSuperview()
         visibilityLabel?.removeFromSuperview()
         distanceLabel?.removeFromSuperview()
@@ -61,38 +58,6 @@ class HUDManager {
         levelLabel?.removeFromSuperview()
         miniMapView?.removeFromSuperview()
         gameOverView?.removeFromSuperview()
-    }
-    
-    // MARK: - Debug Label
-    
-    private func setupBigDebugLabel() {
-        guard let view = view else { return }
-        
-        debugLabel = UILabel()
-        debugLabel.translatesAutoresizingMaskIntoConstraints = false
-        debugLabel.font = UIFont.boldSystemFont(ofSize: 18)
-        debugLabel.textColor = .yellow
-        debugLabel.backgroundColor = UIColor.red.withAlphaComponent(0.8)
-        debugLabel.textAlignment = .center
-        debugLabel.numberOfLines = 0
-        debugLabel.text = "STARTING APP..."
-        
-        view.addSubview(debugLabel)
-        
-        NSLayoutConstraint.activate([
-            debugLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            debugLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            debugLabel.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.8)
-        ])
-        
-        FileLogger.shared.log("✅ Big debug label created and visible")
-    }
-    
-    func updateDebugLabel(_ message: String) {
-        DispatchQueue.main.async { [weak self] in
-            self?.debugLabel.text = message
-            FileLogger.shared.log("📺 Debug label: \(message)")
-        }
     }
     
     // MARK: - Connection Status HUD

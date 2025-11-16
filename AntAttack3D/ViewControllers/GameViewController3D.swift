@@ -69,11 +69,9 @@ class GameViewController3D: UIViewController {
         hudManager.view = view
         hudManager.gameScene = gameScene
         hudManager.setup()
-        hudManager.updateDebugLabel("HUD setup complete")
         
         // Start configuration server polling
         ConfigManager.shared.startPolling()
-        hudManager.updateDebugLabel("Config polling started")
         
         // Setup callbacks
         ConfigManager.shared.onConnectionStatusChanged = { [weak self] isConnected, serverURL in
@@ -133,7 +131,6 @@ class GameViewController3D: UIViewController {
             }
         }
         inputManager.setup()
-        hudManager.updateDebugLabel("Input manager setup complete")
         
         // Start camera update loop
         startCameraUpdateLoop()
@@ -143,7 +140,6 @@ class GameViewController3D: UIViewController {
         os_log("✅ GameViewController viewDidLoad COMPLETE", type: .error)
         FileLogger.shared.log("✅ GameViewController viewDidLoad COMPLETE")
         FileLogger.shared.log("📁 Check log file at: \(FileLogger.shared.getLogPath())")
-        hudManager.updateDebugLabel("✅ READY - Log: \(FileLogger.shared.getLogPath())")
     }
     
     // Make view controller first responder to receive keyboard events
