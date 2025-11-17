@@ -129,8 +129,8 @@ class PhysicsSystem: GameSystem {
             newPosition.y += CGFloat(climbSpeed * dt)
             
             // Hug the wall slightly (move opposite to wall normal)
-            newPosition.x -= CGFloat(wallNormal.x * 0.3 * dt)
-            newPosition.z -= CGFloat(wallNormal.z * 0.3 * dt)
+            newPosition.x -= CGFloat(Float(wallNormal.x) * 0.3 * dt)
+            newPosition.z -= CGFloat(Float(wallNormal.z) * 0.3 * dt)
             
             ballNode.position = newPosition
             
@@ -169,12 +169,7 @@ class PhysicsSystem: GameSystem {
             }
             
             // Move toward platform center
-            let toCenter = SCNVector3(
-                x: Float(platformCenter.x - ballNode.position.x),
-                y: 0,
-                z: Float(platformCenter.z - ballNode.position.z)
-            )
-            let distance = sqrt(toCenter.x * toCenter.x + toCenter.z * toCenter.z)
+            let distance = horizontalDistance(from: ballNode.position, to: platformCenter)
             
             if distance < 0.1 {
                 // Reached center - done climbing
@@ -184,13 +179,11 @@ class PhysicsSystem: GameSystem {
                 // Move toward center
                 let moveDistance = climbCenteringSpeed * dt
                 if distance > moveDistance {
-                    let normalizedMove = SCNVector3(
-                        x: toCenter.x / distance,
-                        y: 0,
-                        z: toCenter.z / distance
-                    )
-                    ballNode.position.x += CGFloat(normalizedMove.x * moveDistance)
-                    ballNode.position.z += CGFloat(normalizedMove.z * moveDistance)
+                    let dx = Float(platformCenter.x - ballNode.position.x)
+                    let dz = Float(platformCenter.z - ballNode.position.z)
+                    let invDist = 1.0 / distance
+                    ballNode.position.x += CGFloat(dx * invDist * moveDistance)
+                    ballNode.position.z += CGFloat(dz * invDist * moveDistance)
                 } else {
                     // Close enough - snap to center
                     ballNode.position = platformCenter
@@ -349,6 +342,20 @@ class PhysicsSystem: GameSystem {
         }
         
         return centerPos
+    }
+    
+    // MARK: - Vector Math Helpers
+    
+    /// Calculate distance between two SCNVector3 positions (horizontal only)
+    private func horizontalDistance(from a: SCNVector3, to b: SCNVector3) -> Float {
+        let dx = Float(b.x - a.x)
+        let dz = Float(b.z - a.z)
+        return sqrtf(dx * dx + dz * dz)
+    }
+    
+    /// Calculate 2D vector length
+    private func length2D(_ x: Float, _ z: Float) -> Float {
+        return sqrtf(x * x + z * z)
     }
     
     func cleanup() {
