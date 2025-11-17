@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CCED0F299F8B48B9B6E4A2A5 /* InputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001B5B94B45D40BE885EFD05 /* InputProvider.swift */; };
+		2CC5CA980CAD437ABAC12053 /* InputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B046179143E4CED9A7F3927 /* InputManager.swift */; };
 		8247A2FE17CC49F8913C081D /* HUDManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E1235A722943B38F02031F /* HUDManager.swift */; };
 		C6FF39D58FE54BFDBD37DCA6 /* InputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */; };
 		F70A464B3CD048E3BE34FDE3 /* InputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B26DC3BE2442DCADB9253D /* InputManager.swift */; };
@@ -36,6 +38,8 @@
 		/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		001B5B94B45D40BE885EFD05 /* InputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProvider.swift; sourceTree = "<group>"; };
+		8B046179143E4CED9A7F3927 /* InputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputManager.swift; sourceTree = "<group>"; };
 		72E1235A722943B38F02031F /* HUDManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDManager.swift; sourceTree = "<group>"; };
 		D48C7EFBA16B4E63A74EBC4B /* InputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProvider.swift; sourceTree = "<group>"; };
 		79B26DC3BE2442DCADB9253D /* InputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputManager.swift; sourceTree = "<group>"; };
@@ -80,6 +84,15 @@
 
 /* Begin PBXGroup section */
 
+		94ED6C3A892941F2BC208F08 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				001B5B94B45D40BE885EFD05 /* InputProvider.swift */,
+				8B046179143E4CED9A7F3927 /* InputManager.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
 		D5130C81A8C44DC7B6B05230 /* UI */ = {
 			isa = PBXGroup;
 			children = (
@@ -121,6 +134,7 @@
 				LS1234567890ABCDEF01 /* LaunchScreen.storyboard */,				F87793B6719F464AAC5E9348 /* Systems */,
 				54B30E44DEA444479187AF16 /* Input */,
 				D5130C81A8C44DC7B6B05230 /* UI */,
+				94ED6C3A892941F2BC208F08 /* Input */,
 );
 			path = AntAttack3D;
 			sourceTree = "<group>";
@@ -248,6 +262,8 @@
 				C6FF39D58FE54BFDBD37DCA6 /* InputProvider.swift in Sources */,
 				F70A464B3CD048E3BE34FDE3 /* InputManager.swift in Sources */,
 				8247A2FE17CC49F8913C081D /* HUDManager.swift in Sources */,
+				CCED0F299F8B48B9B6E4A2A5 /* InputProvider.swift in Sources */,
+				2CC5CA980CAD437ABAC12053 /* InputManager.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};

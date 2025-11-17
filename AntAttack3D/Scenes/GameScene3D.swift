@@ -591,7 +591,8 @@ class GameScene3D: SCNScene {
     }
     
     func moveBall(direction: SCNVector3) {
-        physicsSystem.moveBall(direction: direction)
+        // Convert direction vector to x/z components
+        physicsSystem.moveBall(x: Float(direction.x), z: Float(direction.z))
     }
     
     func jumpBall() {

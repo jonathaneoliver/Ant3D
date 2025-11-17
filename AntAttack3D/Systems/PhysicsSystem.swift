@@ -1,7 +1,22 @@
 import Foundation
 import SceneKit
 
-/// Handles player ball physics, movement, climbing, and ground detection
+/// Movement states for the player ball
+enum MovementState {
+    case groundedWalking
+    case climbingWall(phase: ClimbPhase, targetY: Float, wallNormal: SCNVector3, platformCenter: SCNVector3?)
+    case falling(velocity: Float)
+}
+
+/// Phases of wall climbing
+enum ClimbPhase {
+    case ascending          // Moving up the wall
+    case reachingTop        // Just reached target height
+    case centeringOnPlatform // Moving onto block center
+}
+
+/// Handles player ball movement using direct position-based control
+/// No longer uses physics simulation for player movement (kinematic mode)
 class PhysicsSystem: GameSystem {
     weak var scene: GameScene3D?
     
@@ -10,29 +25,44 @@ class PhysicsSystem: GameSystem {
     private var currentMoveZ: Float = 0.0
     private var isJumping: Bool = false
     
-    // MARK: - Ground & Slope Detection
-    private var isOnSlope: Bool = false
-    private var slopeNormal: SCNVector3 = SCNVector3(0, 1, 0)
-    private var lastGroundCheckTime: TimeInterval = 0
-    private var isGrounded: Bool = false
-    private var wasGrounded: Bool = false  // Track previous frame's grounded state
-    private var normalRestitution: CGFloat = 0.3
-    private var normalFriction: CGFloat = 0.8
+    // MARK: - Movement State
+    private var currentState: MovementState = .groundedWalking
     
-    // MARK: - Climbing State Tracking
-    private var wasClimbingWall: Bool = false  // Track if we were climbing in previous frame
+    // Movement constants
+    private let walkSpeed: Float = 8.0
+    private let climbSpeed: Float = 6.0
+    private let climbCenteringSpeed: Float = 8.0
+    private let fallGravity: Float = -20.0
+    private let maxFallSpeed: Float = -50.0
+    private let ballRadius: Float = 0.5
+    
+    // Raycast distances
+    private let groundCheckDistance: Float = 0.7
+    private let wallCheckDistance: Float = 1.5
+    private let climbForwardDistance: Float = 1.0  // How far forward to center on platform
     
     init() {}
     
     func setup() {
-        // Physics is set up when ball is created
+        // Movement is now position-based, no special physics setup needed
     }
     
     func update(deltaTime: TimeInterval) {
-        updateBallPhysics()
+        guard let scene = scene, let ballNode = scene.ballNode else { return }
+        
+        switch currentState {
+        case .groundedWalking:
+            updateGroundedWalking(ballNode: ballNode, deltaTime: deltaTime)
+            
+        case .climbingWall(let phase, let targetY, let wallNormal, let platformCenter):
+            updateClimbing(ballNode: ballNode, deltaTime: deltaTime, phase: phase, targetY: targetY, wallNormal: wallNormal, platformCenter: platformCenter)
+            
+        case .falling(let velocity):
+            updateFalling(ballNode: ballNode, deltaTime: deltaTime, velocity: velocity)
+        }
     }
     
-    // MARK: - Movement Control
+    // MARK: - Input Methods (called by InputManager)
     
     /// Set movement direction from controller input
     func moveBall(x: Float, z: Float) {
@@ -40,250 +70,213 @@ class PhysicsSystem: GameSystem {
         currentMoveZ = z
     }
     
-    /// Set movement direction with direct velocity (legacy method)
-    func moveBall(direction: SCNVector3) {
-        guard let scene = scene, let ballNode = scene.ballNode else { return }
-        guard let physicsBody = ballNode.physicsBody else { return }
-        
-        let speed: Float = GameConstants.Movement.playerSpeed
-        let newVelocity = SCNVector3(
-            x: direction.x * speed,
-            y: physicsBody.velocity.y,  // Preserve vertical velocity
-            z: direction.z * speed
-        )
-        physicsBody.velocity = newVelocity
-    }
-    
     /// Start wall-climbing mode
     func jumpBall() {
-        guard let scene = scene, let ballNode = scene.ballNode else { return }
-        guard let physicsBody = ballNode.physicsBody else { return }
-        
         isJumping = true
-        
-        // Reduce restitution to prevent bouncing off walls
-        physicsBody.restitution = 0.0
-        physicsBody.friction = 2.0
     }
     
     /// Stop wall-climbing mode
     func releaseJump() {
-        guard let scene = scene, let ballNode = scene.ballNode else { return }
-        guard let physicsBody = ballNode.physicsBody else { return }
-        
         isJumping = false
-        
-        // Cancel upward velocity immediately
-        if physicsBody.velocity.y > 0 {
-            physicsBody.velocity.y = 0
-        }
-        
-        // Restore normal physics properties
-        physicsBody.restitution = normalRestitution
-        physicsBody.friction = normalFriction
     }
     
-    // MARK: - Physics Update
+    // MARK: - State Updates
     
-    /// Update ball physics based on current input (called every frame)
-    private func updateBallPhysics() {
-        guard let scene = scene, let ballNode = scene.ballNode else { return }
-        guard let physicsBody = ballNode.physicsBody else { return }
-        guard let cameraSystem = scene.cameraSystem else { return }
-        
-        // Check ground/slope state
-        checkGroundState()
-        
-        // Transform input to be camera-relative
-        let cameraAngleRadians = cameraSystem.cameraOrbitAngle * Float.pi / 180.0
-        
-        // Rotate input vector by camera angle
-        let worldX = currentMoveX * cos(cameraAngleRadians) + currentMoveZ * sin(cameraAngleRadians)
-        let worldZ = -currentMoveX * sin(cameraAngleRadians) + currentMoveZ * cos(cameraAngleRadians)
-        
-        // Calculate movement direction and speed
-        let speed: Float = GameConstants.Movement.playerSpeed
-        var moveDirection = SCNVector3(x: worldX, y: 0, z: worldZ)
-        
-        // Apply slope climbing assistance if on a slope and moving
-        var dampingFactor: Float = 1.0
-        if isOnSlope && (abs(worldX) > 0.1 || abs(worldZ) > 0.1) {
-            let normalizedMove = normalize(moveDirection)
-            let upDot = dot(normalizedMove, slopeNormal)
-            
-            // If moving uphill
-            if upDot < 0 {
-                let slopeAngle = acos(slopeNormal.y)
-                let climbAssist: Float = tan(slopeAngle) * 40.0
-                moveDirection.y = climbAssist
-            } else if upDot > 0 {
-                // Going downhill - apply damping
-                dampingFactor = 0.5
-            }
-        }
-        
-        // Check for wall climbing mode
-        var climbingWall = false
+    private func updateGroundedWalking(ballNode: SCNNode, deltaTime: TimeInterval) {
+        // Check if climb button pressed and wall ahead
         if isJumping {
-            let wallCheck = checkWallAhead()
-            
-            if wallCheck.hasWall && wallCheck.distance < 0.6 {
-                climbingWall = true
-                
-                let climbSpeed: Float = GameConstants.Movement.climbSpeed
-                moveDirection.y = climbSpeed
-                
-                // Constrain horizontal movement to cardinal directions
-                if abs(worldX) > abs(worldZ) {
-                    moveDirection.x = worldX > 0 ? abs(worldX) : -abs(worldX)
-                    moveDirection.z = 0
-                } else {
-                    moveDirection.x = 0
-                    moveDirection.z = worldZ > 0 ? abs(worldZ) : -abs(worldZ)
-                }
-            }
-        }
-        
-        // Apply movement - only if there's input or we're in a special state
-        let hasMovementInput = abs(currentMoveX) > 0.01 || abs(currentMoveZ) > 0.01
-        let shouldOverrideY = climbingWall || (isOnSlope && moveDirection.y != 0)
-        
-        if shouldOverrideY {
-            // Climbing or slope assist - set all 3 velocity components
-            let newVelocity = SCNVector3(
-                x: moveDirection.x * speed * dampingFactor,
-                y: moveDirection.y,
-                z: moveDirection.z * speed * dampingFactor
-            )
-            physicsBody.velocity = newVelocity
-        } else if hasMovementInput && (isGrounded || isJumping) {
-            // Normal movement - allow horizontal movement when grounded OR when jump button is held
-            // (Jump button allows repositioning while climbing, but without wall = no vertical climb)
-            physicsBody.velocity.x = moveDirection.x * speed * dampingFactor
-            physicsBody.velocity.z = moveDirection.z * speed * dampingFactor
-        }
-        // If not grounded, not jumping, and no input, let physics (gravity) handle everything
-        
-        // OPTION 1: Auto-stop when reaching top of wall
-        // Detect transition from climbing to grounded (reached platform top)
-        if wasClimbingWall && !climbingWall && isGrounded && isJumping {
-            // Just reached the top of a climb - zero Y velocity to stick to platform
-            physicsBody.velocity.y = 0
-        }
-        
-        // OPTION 3: Apply landing damping when touching ground
-        // Helps ball "stick" to platforms instead of bouncing over
-        if !wasGrounded && isGrounded {
-            // Just landed - apply strong Y damping to grip the surface
-            physicsBody.velocity.y *= 0.3
-        }
-        
-        // Update state tracking for next frame
-        wasGrounded = isGrounded
-        wasClimbingWall = climbingWall
-        
-        // Apply damping to downhill velocity
-        if isOnSlope {
-            let currentVel = physicsBody.velocity
-            let velDot = dot(SCNVector3(x: currentVel.x, y: 0, z: currentVel.z), slopeNormal)
-            if velDot > 0 {
-                physicsBody.velocity = SCNVector3(
-                    x: currentVel.x * 0.9,
-                    y: currentVel.y,
-                    z: currentVel.z * 0.9
+            if let climbInfo = checkForClimbableWall(ballNode: ballNode) {
+                // Start climbing
+                currentState = .climbingWall(
+                    phase: .ascending,
+                    targetY: climbInfo.topY,
+                    wallNormal: climbInfo.wallNormal,
+                    platformCenter: nil
                 )
-            }
-        }
-    }
-    
-    // MARK: - Ground & Wall Detection
-    
-    /// Check if ball is on ground or slope using raycasting
-    private func checkGroundState() {
-        guard let scene = scene, let ballNode = scene.ballNode else { return }
-        
-        let currentTime = CACurrentMediaTime()
-        if currentTime - lastGroundCheckTime < 0.05 {
-            return
-        }
-        lastGroundCheckTime = currentTime
-        
-        let ballPosition = ballNode.presentation.position
-        
-        // Cast ray downward from ball center
-        let rayStart = ballPosition
-        let rayEnd = SCNVector3(x: ballPosition.x, y: ballPosition.y - 0.6, z: ballPosition.z)
-        
-        let hitResults = scene.rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: [
-            SCNHitTestOption.searchMode.rawValue: SCNHitTestSearchMode.all.rawValue,
-            SCNHitTestOption.backFaceCulling.rawValue: false
-        ])
-        
-        // Find first hit that isn't the ball itself
-        for hit in hitResults {
-            if hit.node != ballNode {
-                let normal = hit.worldNormal
-                
-                isGrounded = true
-                
-                // Check if we're on a slope
-                let verticalDot = abs(normal.y)
-                if verticalDot < 0.98 {  // Not vertical (< ~11 degrees from horizontal)
-                    isOnSlope = true
-                    slopeNormal = normal
-                } else {
-                    isOnSlope = false
-                    slopeNormal = SCNVector3(0, 1, 0)
-                }
                 return
             }
         }
         
-        // No ground detected - ball is in the air
-        isGrounded = false
-        isOnSlope = false
-        slopeNormal = SCNVector3(0, 1, 0)
+        // Apply joystick movement directly to position
+        let speed = walkSpeed * Float(deltaTime)
+        var newPosition = ballNode.position
+        newPosition.x += CGFloat(currentMoveX * speed)
+        newPosition.z += CGFloat(currentMoveZ * speed)
+        
+        // Check if ground exists at new position
+        if let groundY = raycastGroundHeight(at: newPosition) {
+            // Ground exists - move there
+            newPosition.y = groundY + CGFloat(ballRadius)
+            ballNode.position = newPosition
+        } else {
+            // No ground - check if we should fall
+            if let _ = raycastGroundHeight(at: ballNode.position) {
+                // Still on current ground, don't move
+            } else {
+                // No ground under current position either - start falling
+                currentState = .falling(velocity: 0)
+            }
+        }
     }
     
-    /// Check if there's a wall in front of the ball
-    private func checkWallAhead() -> (hasWall: Bool, distance: Float, normal: SCNVector3) {
-        guard let scene = scene, let ballNode = scene.ballNode else {
-            return (false, 0, SCNVector3(0, 1, 0))
+    private func updateClimbing(ballNode: SCNNode, deltaTime: TimeInterval, phase: ClimbPhase, targetY: Float, wallNormal: SCNVector3, platformCenter: SCNVector3?) {
+        let dt = Float(deltaTime)
+        
+        switch phase {
+        case .ascending:
+            // Move up the wall
+            var newPosition = ballNode.position
+            newPosition.y += CGFloat(climbSpeed * dt)
+            
+            // Hug the wall slightly (move opposite to wall normal)
+            newPosition.x -= CGFloat(wallNormal.x * 0.3 * dt)
+            newPosition.z -= CGFloat(wallNormal.z * 0.3 * dt)
+            
+            ballNode.position = newPosition
+            
+            // Check if reached top
+            if Float(ballNode.position.y) >= targetY {
+                // Transition to reaching top phase
+                currentState = .climbingWall(
+                    phase: .reachingTop,
+                    targetY: targetY,
+                    wallNormal: wallNormal,
+                    platformCenter: nil
+                )
+            }
+            
+        case .reachingTop:
+            // Calculate platform center position
+            let forwardDirection = SCNVector3(x: -wallNormal.x, y: 0, z: -wallNormal.z)
+            let centerPos = findPlatformCenter(fromPosition: ballNode.position, direction: forwardDirection)
+            
+            // Snap Y to target height
+            ballNode.position.y = CGFloat(targetY)
+            
+            // Transition to centering phase
+            currentState = .climbingWall(
+                phase: .centeringOnPlatform,
+                targetY: targetY,
+                wallNormal: wallNormal,
+                platformCenter: centerPos
+            )
+            
+        case .centeringOnPlatform:
+            guard let platformCenter = platformCenter else {
+                // No center calculated - just finish
+                currentState = .groundedWalking
+                return
+            }
+            
+            // Move toward platform center
+            let toCenter = SCNVector3(
+                x: Float(platformCenter.x - ballNode.position.x),
+                y: 0,
+                z: Float(platformCenter.z - ballNode.position.z)
+            )
+            let distance = sqrt(toCenter.x * toCenter.x + toCenter.z * toCenter.z)
+            
+            if distance < 0.1 {
+                // Reached center - done climbing
+                ballNode.position = platformCenter
+                currentState = .groundedWalking
+            } else {
+                // Move toward center
+                let moveDistance = climbCenteringSpeed * dt
+                if distance > moveDistance {
+                    let normalizedMove = SCNVector3(
+                        x: toCenter.x / distance,
+                        y: 0,
+                        z: toCenter.z / distance
+                    )
+                    ballNode.position.x += CGFloat(normalizedMove.x * moveDistance)
+                    ballNode.position.z += CGFloat(normalizedMove.z * moveDistance)
+                } else {
+                    // Close enough - snap to center
+                    ballNode.position = platformCenter
+                    currentState = .groundedWalking
+                }
+            }
         }
-        guard let cameraSystem = scene.cameraSystem else {
-            return (false, 0, SCNVector3(0, 1, 0))
+    }
+    
+    private func updateFalling(ballNode: SCNNode, deltaTime: TimeInterval, velocity: Float) {
+        let dt = Float(deltaTime)
+        
+        // Apply gravity
+        var newVelocity = velocity + fallGravity * dt
+        newVelocity = max(newVelocity, maxFallSpeed)  // Cap fall speed
+        
+        // Update position
+        var newPosition = ballNode.position
+        newPosition.y += CGFloat(newVelocity * dt)
+        
+        // Check for ground
+        if let groundY = raycastGroundHeight(at: newPosition) {
+            if Float(newPosition.y) <= groundY + ballRadius {
+                // Landed
+                newPosition.y = groundY + CGFloat(ballRadius)
+                ballNode.position = newPosition
+                currentState = .groundedWalking
+                return
+            }
         }
         
-        let ballPosition = ballNode.presentation.position
+        // Still falling
+        ballNode.position = newPosition
+        currentState = .falling(velocity: newVelocity)
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func raycastGroundHeight(at position: SCNVector3) -> CGFloat? {
+        guard let scene = scene else { return nil }
         
-        // Calculate movement direction in world space
+        let rayStart = SCNVector3(x: position.x, y: position.y + 0.5, z: position.z)
+        let rayEnd = SCNVector3(x: position.x, y: position.y - CGFloat(groundCheckDistance), z: position.z)
+        
+        let hitResults = scene.rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: [
+            SCNHitTestOption.searchMode.rawValue: SCNHitTestSearchMode.closest.rawValue,
+            SCNHitTestOption.backFaceCulling.rawValue: false
+        ])
+        
+        for hit in hitResults {
+            if hit.node != scene.ballNode {
+                return hit.worldCoordinates.y
+            }
+        }
+        
+        return nil
+    }
+    
+    private func checkForClimbableWall(ballNode: SCNNode) -> (topY: Float, wallNormal: SCNVector3)? {
+        guard let scene = scene else { return nil }
+        guard let cameraSystem = scene.cameraSystem else { return nil }
+        
+        // Transform joystick input to world space
         let cameraAngleRadians = cameraSystem.cameraOrbitAngle * Float.pi / 180.0
         let worldX = currentMoveX * cos(cameraAngleRadians) + currentMoveZ * sin(cameraAngleRadians)
         let worldZ = -currentMoveX * sin(cameraAngleRadians) + currentMoveZ * cos(cameraAngleRadians)
         
-        // Only check if there's significant horizontal movement
-        if abs(worldX) < 0.1 && abs(worldZ) < 0.1 {
-            return (false, 0, SCNVector3(0, 1, 0))
-        }
+        // Only check if there's movement input
+        let inputMagnitude = sqrt(worldX * worldX + worldZ * worldZ)
+        guard inputMagnitude > 0.1 else { return nil }
         
         // Normalize direction
-        let length = sqrt(worldX * worldX + worldZ * worldZ)
-        let dirX = worldX / length
-        let dirZ = worldZ / length
+        let dirX = worldX / inputMagnitude
+        let dirZ = worldZ / inputMagnitude
         
-        // Cast ray forward to detect walls
-        let rayStartOffset: Float = 0.2
-        let checkDistance: Float = 1.5
-        let rayHeight: Float = 0.5
+        // Cast ray forward to detect wall
+        let ballPosition = ballNode.position
         let rayStart = SCNVector3(
-            x: ballPosition.x + dirX * rayStartOffset,
-            y: ballPosition.y + rayHeight,
-            z: ballPosition.z + dirZ * rayStartOffset
+            x: ballPosition.x + CGFloat(dirX * 0.2),
+            y: ballPosition.y + 0.5,
+            z: ballPosition.z + CGFloat(dirZ * 0.2)
         )
         let rayEnd = SCNVector3(
-            x: ballPosition.x + dirX * (rayStartOffset + checkDistance),
-            y: ballPosition.y + rayHeight,
-            z: ballPosition.z + dirZ * (rayStartOffset + checkDistance)
+            x: ballPosition.x + CGFloat(dirX * wallCheckDistance),
+            y: ballPosition.y + 0.5,
+            z: ballPosition.z + CGFloat(dirZ * wallCheckDistance)
         )
         
         let hitResults = scene.rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: [
@@ -291,39 +284,71 @@ class PhysicsSystem: GameSystem {
             SCNHitTestOption.backFaceCulling.rawValue: false
         ])
         
-        // Find first hit that isn't the ball
         for hit in hitResults {
             if hit.node != ballNode {
                 let normal = hit.worldNormal
                 
-                // Check if this is a vertical wall
+                // Check if this is a vertical wall (not floor/ceiling)
                 let horizontalDot = sqrt(normal.x * normal.x + normal.z * normal.z)
-                
-                if horizontalDot > 0.7 {  // More than 45 degrees from horizontal = wall
-                    let distance = sqrt(
-                        pow(hit.worldCoordinates.x - ballPosition.x, 2) +
-                        pow(hit.worldCoordinates.z - ballPosition.z, 2)
-                    )
-                    return (true, distance, normal)
+                if horizontalDot > 0.7 {
+                    // This is a wall - find the top
+                    if let topY = findWallTop(from: ballPosition, direction: SCNVector3(x: dirX, y: 0, z: dirZ)) {
+                        return (topY: Float(topY), wallNormal: normal)
+                    }
                 }
             }
         }
         
-        return (false, 0, SCNVector3(0, 1, 0))
+        return nil
     }
     
-    // MARK: - Vector Math Helpers
-    
-    private func normalize(_ v: SCNVector3) -> SCNVector3 {
-        let length = sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
-        if length > 0.0001 {
-            return SCNVector3(x: v.x / length, y: v.y / length, z: v.z / length)
+    private func findWallTop(from position: SCNVector3, direction: SCNVector3) -> CGFloat? {
+        guard let scene = scene else { return nil }
+        
+        // Cast ray upward to find top of wall
+        let rayStart = SCNVector3(x: position.x, y: position.y, z: position.z)
+        let rayEnd = SCNVector3(x: position.x, y: position.y + 20.0, z: position.z)
+        
+        let hitResults = scene.rootNode.hitTestWithSegment(from: rayStart, to: rayEnd, options: [
+            SCNHitTestOption.searchMode.rawValue: SCNHitTestSearchMode.all.rawValue,
+            SCNHitTestOption.backFaceCulling.rawValue: false
+        ])
+        
+        // Find highest horizontal surface above us
+        var highestY: CGFloat = position.y + 1.0  // At least climb 1 unit
+        
+        for hit in hitResults {
+            if hit.node != scene.ballNode {
+                let normal = hit.worldNormal
+                // Check if this is a horizontal surface (floor/ceiling)
+                if abs(normal.y) > 0.9 && normal.y > 0 {
+                    // This is a floor - potential top of wall
+                    highestY = max(highestY, hit.worldCoordinates.y)
+                }
+            }
         }
-        return SCNVector3(0, 0, 0)
+        
+        return highestY
     }
     
-    private func dot(_ a: SCNVector3, _ b: SCNVector3) -> Float {
-        return a.x * b.x + a.y * b.y + a.z * b.z
+    private func findPlatformCenter(fromPosition: SCNVector3, direction: SCNVector3) -> SCNVector3 {
+        // Move forward by climbForwardDistance
+        var centerPos = SCNVector3(
+            x: fromPosition.x + CGFloat(direction.x * climbForwardDistance),
+            y: fromPosition.y,
+            z: fromPosition.z + CGFloat(direction.z * climbForwardDistance)
+        )
+        
+        // Snap to block center (blocks are 1.0 units, centers at 0.5, 1.5, 2.5, etc.)
+        centerPos.x = floor(centerPos.x) + 0.5
+        centerPos.z = floor(centerPos.z) + 0.5
+        
+        // Find ground height at this position
+        if let groundY = raycastGroundHeight(at: centerPos) {
+            centerPos.y = groundY + CGFloat(ballRadius)
+        }
+        
+        return centerPos
     }
     
     func cleanup() {
