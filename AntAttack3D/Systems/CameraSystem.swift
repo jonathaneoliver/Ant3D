@@ -63,12 +63,12 @@ class CameraSystem: GameSystem {
         // Use presentation node to get actual rendered position during physics simulation
         let ballPosition = ballNode.presentation.position
         
-        // Log ball position periodically
-        if updateCameraFrameCount % 60 == 0 {  // Log every second at 60fps
-            if let velocity = ballNode.physicsBody?.velocity {
-                logger.debug("Ball: pos=(\(ballPosition.x), \(ballPosition.y), \(ballPosition.z)) vel=(\(velocity.x), \(velocity.y), \(velocity.z))")
-            }
-        }
+        // Log ball position periodically (disabled)
+//        if updateCameraFrameCount % 60 == 0 {  // Log every second at 60fps
+//            if let velocity = ballNode.physicsBody?.velocity {
+//                logger.debug("Ball: pos=(\(ballPosition.x), \(ballPosition.y), \(ballPosition.z)) vel=(\(velocity.x), \(velocity.y), \(velocity.z))")
+//            }
+//        }
         
         // Calculate camera position
         let angleRadians = droneAngle * Float.pi / 180.0
@@ -107,9 +107,9 @@ class CameraSystem: GameSystem {
         
         // Report distance to HUD
         distanceUpdateCount += 1
-        if distanceUpdateCount % 60 == 0 {
-            logger.debug("Distance: \(actualDistance)")
-        }
+//        if distanceUpdateCount % 60 == 0 {
+//            logger.debug("Distance: \(actualDistance)")
+//        }
         onDistanceChanged?(actualDistance)
         
         // Check visibility and update state
